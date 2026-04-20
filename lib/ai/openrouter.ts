@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { resolveAppBaseUrl } from '@/lib/app-url'
 
 type ChatMessage = {
   role: 'system' | 'user' | 'assistant'
@@ -29,7 +30,7 @@ function getOpenRouterHeaders() {
     throw new Error('OPENROUTER_API_KEY is missing. Add it to .env.local to enable AI features.')
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://cv-builder-gray-five.vercel.app'
+  const appUrl = resolveAppBaseUrl()
 
   return {
     Authorization: `Bearer ${apiKey}`,

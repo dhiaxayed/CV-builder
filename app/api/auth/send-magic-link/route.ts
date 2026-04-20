@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthToken, getUserByEmail, createUser } from '@/lib/db/users'
 import { sendMagicLinkEmail } from '@/lib/email'
+import { resolveAppBaseUrl } from '@/lib/app-url'
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,9 +29,9 @@ export async function POST(request: NextRequest) {
     // Create auth token
     const token = await createAuthToken(normalizedEmail)
     
-    // Build verification URL
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-    const verifyUrl = `${baseUrl}/api/auth/verify?token=${token}`
+    // Build verification URL from the current request origin first, then env fallbacks.
+    const baseUrl = resolveAppBaseUrl(request.nextUrl.origin)
+    const verifyUrl = `${baseUrl}/api/auth/verify?token=${encodeURIComponent(token)}`
     
     // Send magic link email
     const emailResult = await sendMagicLinkEmail(normalizedEmail, verifyUrl)

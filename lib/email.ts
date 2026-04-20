@@ -2,6 +2,7 @@
 // Supports multiple providers: Resend, Nodemailer (SMTP/Gmail), Console (dev)
 
 import nodemailer from 'nodemailer'
+import { resolveAppBaseUrl } from '@/lib/app-url'
 
 interface EmailOptions {
   to: string
@@ -161,6 +162,7 @@ Privacy | Terms | Help
 }
 
 export function getWelcomeEmail(name: string): { html: string; text: string } {
+  const appUrl = resolveAppBaseUrl()
   const html = `
 <!DOCTYPE html>
 <html>
@@ -195,7 +197,7 @@ export function getWelcomeEmail(name: string): { html: string; text: string } {
     </p>
     
     <div style="text-align: center; margin: 30px 0;">
-      <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://cv-builder-gray-five.vercel.app'}/dashboard" 
+      <a href="${appUrl}/dashboard" 
          style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 14px 40px; text-decoration: none; border-radius: 8px; font-weight: 600;">
         Go to Dashboard
       </a>
@@ -220,7 +222,7 @@ Here's what you can do:
 - Share your CV with a unique link
 - Export to professional PDF format
 
-Get started: ${process.env.NEXT_PUBLIC_APP_URL || 'https://cv-builder-gray-five.vercel.app'}/dashboard
+Get started: ${appUrl}/dashboard
   `.trim()
 
   return { html, text }
