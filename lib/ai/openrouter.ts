@@ -29,7 +29,7 @@ function getOpenRouterHeaders() {
     throw new Error('OPENROUTER_API_KEY is missing. Add it to .env.local to enable AI features.')
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://cv-builder-gray-five.vercel.app'
 
   return {
     Authorization: `Bearer ${apiKey}`,

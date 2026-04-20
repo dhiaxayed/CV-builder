@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3001';
+const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'https://cv-builder-gray-five.vercel.app';
 const shouldStartWebServer = process.env.PLAYWRIGHT_SKIP_WEBSERVER !== '1';
 
 /**

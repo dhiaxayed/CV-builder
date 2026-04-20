@@ -11,4 +11,4 @@ services:
       - .env.production
     environment:
       LATEX_CMD: xelatex
-      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3001}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://cv-builder-gray-five.vercel.app}
