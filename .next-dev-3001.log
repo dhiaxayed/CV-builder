@@ -935,3 +935,80 @@ Creating turbopack project {
  ○ Compiling / ...
  GET / 200 in 4.7s (compile: 4.0s, proxy.ts: 160ms, render: 539ms)
  GET /api/auth/session 200 in 930ms (compile: 896ms, render: 34ms)
+ GET / 200 in 221ms (compile: 139ms, proxy.ts: 10ms, render: 72ms)
+ GET / 200 in 78ms (compile: 6ms, proxy.ts: 8ms, render: 63ms)
+ GET /auth/signin 200 in 884ms (compile: 689ms, proxy.ts: 8ms, render: 187ms)
+ GET /api/auth/session 200 in 46ms (compile: 37ms, render: 9ms)
+[Email] Sent via SMTP: <799ecc2a-a726-26f7-2c1f-423970c38b2f@gmail.com>
+[Auth] Magic link for testuser@example.com : http://localhost:3001/api/auth/verify?token=VkJvJOY2e0xZ71Xh3vAKod6b9meysUbq
+ POST /api/auth/send-magic-link 200 in 2.7s (compile: 379ms, render: 2.3s)
+[Auth Verify] Token received: VkJvJOY2e0...
+[Auth Verify] Email from token: testuser@example.com
+[Auth Verify] User found: DbBaNVQx7efIUft2OKPb7
+[Auth Verify] Session created
+[Auth Verify] Redirecting to dashboard
+ GET /api/auth/verify?token=VkJvJOY2e0xZ71Xh3vAKod6b9meysUbq 307 in 734ms (compile: 205ms, render: 529ms)
+ GET /dashboard 200 in 1219ms (compile: 1062ms, proxy.ts: 9ms, render: 148ms)
+ GET /api/auth/session 200 in 218ms (compile: 5ms, render: 213ms)
+ GET /api/cvs 200 in 691ms (compile: 192ms, render: 499ms)
+ GET /auth/signin 200 in 134ms (compile: 8ms, proxy.ts: 8ms, render: 118ms)
+ GET /api/auth/session 200 in 14ms (compile: 4ms, render: 10ms)
+[Email] Sent via SMTP: <9d022b4a-4127-7166-32a3-28a3788771e0@gmail.com>
+[Auth] Magic link for playwright-1776727203514-gh74ws@example.com : http://localhost:3001/api/auth/verify?token=n8WzUUvSqkqFJYxMveH97RJoPx07ezbc
+ POST /api/auth/send-magic-link 200 in 1839ms (compile: 4ms, render: 1835ms)
+[Auth Verify] Token received: n8WzUUvSqk...
+[Auth Verify] Email from token: playwright-1776727203514-gh74ws@example.com
+[Auth Verify] User found: zjwO3qgWGnvP4qinBpNCP
+[Auth Verify] Session created
+[Auth Verify] Redirecting to dashboard
+ GET /api/auth/verify?token=n8WzUUvSqkqFJYxMveH97RJoPx07ezbc 307 in 461ms (compile: 6ms, render: 456ms)
+ GET /dashboard 200 in 114ms (compile: 8ms, proxy.ts: 9ms, render: 97ms)
+ GET /api/auth/session 200 in 204ms (compile: 3ms, render: 201ms)
+ GET /api/cvs 200 in 279ms (compile: 4ms, render: 275ms)
+ GET /cv/new 200 in 690ms (compile: 611ms, proxy.ts: 18ms, render: 61ms)
+ POST /api/cvs 200 in 646ms (compile: 4ms, render: 642ms)
+ GET /cv/n51CopAP8QL31SGN25PTi/edit 200 in 1736ms (compile: 1655ms, proxy.ts: 19ms, render: 62ms)
+ GET /api/cvs/n51CopAP8QL31SGN25PTi 200 in 1400ms (compile: 979ms, render: 421ms)
+ GET /api/cvs/n51CopAP8QL31SGN25PTi 200 in 384ms (compile: 14ms, render: 370ms)
+ GET /auth/signin 200 in 112ms (compile: 5ms, proxy.ts: 7ms, render: 100ms)
+ GET /api/auth/session 200 in 10ms (compile: 3ms, render: 7ms)
+[Email] Sent via SMTP: <8456042d-6ebf-27e7-756e-1f7fac3fbc63@gmail.com>
+[Auth] Magic link for playwright-1776727213901-5ehl2t@example.com : http://localhost:3001/api/auth/verify?token=B-4KGpnBZd8r1-bZPbk_uj5yp_obZYf1
+ POST /api/auth/send-magic-link 200 in 1692ms (compile: 4ms, render: 1688ms)
+[Auth Verify] Token received: B-4KGpnBZd...
+[Auth Verify] Email from token: playwright-1776727213901-5ehl2t@example.com
+[Auth Verify] User found: rer77EdVDqnqZBcUQESq5
+[Auth Verify] Session created
+[Auth Verify] Redirecting to dashboard
+ GET /api/auth/verify?token=B-4KGpnBZd8r1-bZPbk_uj5yp_obZYf1 307 in 407ms (compile: 4ms, render: 403ms)
+ GET /dashboard 200 in 85ms (compile: 5ms, proxy.ts: 7ms, render: 73ms)
+ GET /api/auth/session 200 in 182ms (compile: 3ms, render: 179ms)
+ GET /api/cvs 200 in 304ms (compile: 5ms, render: 300ms)
+ GET /cv/new 200 in 52ms (compile: 6ms, proxy.ts: 7ms, render: 38ms)
+ POST /api/cvs 200 in 629ms (compile: 5ms, render: 625ms)
+ GET /cv/kO-5HGnJJzdhkjr89n1cO/edit 200 in 66ms (compile: 23ms, proxy.ts: 7ms, render: 36ms)
+ GET /api/cvs/kO-5HGnJJzdhkjr89n1cO 200 in 365ms (compile: 13ms, render: 352ms)
+ GET /api/cvs/kO-5HGnJJzdhkjr89n1cO 200 in 377ms (compile: 4ms, render: 373ms)
+ POST /api/ai/review 200 in 33.9s (compile: 287ms, render: 33.6s)
+ POST /api/ai/tailor 403 in 415ms (compile: 182ms, render: 233ms)
+ POST /api/cvs/kO-5HGnJJzdhkjr89n1cO/versions 200 in 1866ms (compile: 1036ms, render: 830ms)
+ GET /cv/kO-5HGnJJzdhkjr89n1cO/versions 200 in 1334ms (compile: 1116ms, proxy.ts: 18ms, render: 200ms)
+ GET /api/auth/session 200 in 219ms (compile: 4ms, render: 215ms)
+ GET /api/cvs/kO-5HGnJJzdhkjr89n1cO/versions 200 in 407ms (compile: 15ms, render: 392ms)
+ GET /cv/kO-5HGnJJzdhkjr89n1cO/export 200 in 1237ms (compile: 1099ms, proxy.ts: 7ms, render: 132ms)
+ GET /api/auth/session 200 in 190ms (compile: 3ms, render: 187ms)
+ GET /api/cvs/kO-5HGnJJzdhkjr89n1cO 200 in 414ms (compile: 14ms, render: 399ms)
+ GET /auth/signin 200 in 105ms (compile: 5ms, proxy.ts: 6ms, render: 93ms)
+ GET /api/auth/session 200 in 25ms (compile: 4ms, render: 22ms)
+[Email] Sent via SMTP: <da6316d6-d74d-42bb-abe1-54076eaef3e2@gmail.com>
+[Auth] Magic link for playwright-1776727262730-sxyx7t@example.com : http://localhost:3001/api/auth/verify?token=T6_HWu6J1PrFZkhT5akVkYMBs-NMxNqK
+ POST /api/auth/send-magic-link 200 in 1442ms (compile: 4ms, render: 1439ms)
+[Auth Verify] Token received: T6_HWu6J1P...
+[Auth Verify] Email from token: playwright-1776727262730-sxyx7t@example.com
+[Auth Verify] User found: OWv1U0hhKvJP_Euj-bsIr
+[Auth Verify] Session created
+[Auth Verify] Redirecting to dashboard
+ GET /api/auth/verify?token=T6_HWu6J1PrFZkhT5akVkYMBs-NMxNqK 307 in 407ms (compile: 5ms, render: 402ms)
+ GET /dashboard 200 in 103ms (compile: 6ms, proxy.ts: 11ms, render: 86ms)
+ GET /api/auth/session 200 in 204ms (compile: 3ms, render: 201ms)
+ GET /api/cvs 200 in 304ms (compile: 3ms, render: 301ms)
