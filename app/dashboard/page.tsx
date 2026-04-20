@@ -37,6 +37,9 @@ import {
   Clock,
   FileDown,
   Loader2,
+  Sparkles,
+  Shield,
+  FileSearch,
 } from 'lucide-react'
 import type { CVData } from '@/lib/db'
 
@@ -212,6 +215,55 @@ export default function DashboardPage() {
             </Button>
           </div>
         </div>
+
+        <Card className="mb-8 border-primary/20 bg-primary/5">
+          <CardContent className="pt-6">
+            <div className="space-y-3">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-primary" />
+                  <p className="text-lg font-semibold">AI Job Search Toolkit</p>
+                </div>
+                <p className="max-w-2xl text-sm text-muted-foreground">
+                  Create a CV with the main button above, then open it to run an AI ATS review, tailor it to a job description,
+                  generate a sharper summary, surface missing keywords, and apply suggested bullet rewrites directly inside the editor.
+                </p>
+                <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
+                  <div className="rounded-md bg-background px-3 py-2">
+                    <span className="font-medium text-foreground">1. Create or open a CV</span>
+                    <p className="mt-1">Start with sample data if you want to explore the full workflow quickly.</p>
+                  </div>
+                  <div className="rounded-md bg-background px-3 py-2">
+                    <span className="font-medium text-foreground">2. Run review and tailoring</span>
+                    <p className="mt-1">Use AI Assist for strict ATS checks, then paste a target job description.</p>
+                  </div>
+                  <div className="rounded-md bg-background px-3 py-2">
+                    <span className="font-medium text-foreground">3. Save targeted versions</span>
+                    <p className="mt-1">Apply only truthful suggestions, save a version, then export the final CV.</p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-background px-3 py-1 text-xs text-muted-foreground">
+                    <Shield className="h-3 w-3 text-primary" />
+                    AI ATS Review
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-background px-3 py-1 text-xs text-muted-foreground">
+                    <FileSearch className="h-3 w-3 text-primary" />
+                    Job Description Tailoring
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-background px-3 py-1 text-xs text-muted-foreground">
+                    <Sparkles className="h-3 w-3 text-primary" />
+                    Apply Suggested Rewrites
+                  </span>
+                </div>
+              </div>
+              <div className="max-w-2xl rounded-md border bg-background px-4 py-3 text-sm text-muted-foreground">
+                Use <span className="font-medium text-foreground">Create New CV</span>, then open the CV and go to
+                <span className="font-medium text-foreground"> AI Assist</span>.
+              </div>
+            </div>
+          </CardContent>
+        </Card>
         
         {cvs.length === 0 ? (
           <Card className="border-dashed">
@@ -221,7 +273,7 @@ export default function DashboardPage() {
               </div>
               <h3 className="text-lg font-semibold mb-2">No CVs yet</h3>
               <p className="text-muted-foreground text-center mb-4 max-w-sm">
-                Create your first CV to get started.
+                Create your first CV to get started. You can begin with sample data, test the AI workflow, then replace it with your own experience.
               </p>
               <div className="flex items-center gap-3">
                 <Button onClick={() => router.push('/cv/new')}>
@@ -288,10 +340,21 @@ export default function DashboardPage() {
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
+                </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="aspect-3/4 bg-muted rounded-md overflow-hidden mb-3">
+                    <img
+                      src={`/templates/${cv.template_id}.svg`}
+                      alt={`${cv.title} template preview`}
+                      loading="lazy"
+                      className="h-full w-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.src = '/templates/modern.svg'
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-3">
                       {currentVersion && (
                         <div className="text-sm text-muted-foreground">
                           <p className="font-medium text-foreground">

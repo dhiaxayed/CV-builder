@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
-import { CV, CVVersion, getCV, restoreVersion } from '@/lib/storage'
+import { CVData } from '@/lib/types/cv'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -17,7 +17,23 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
-import { ArrowLeft, History, FileText, Clock, RotateCcw, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, History, Clock, RotateCcw, CheckCircle2 } from 'lucide-react'
+
+type DbCVVersion = {
+  id: string
+  version: number
+  data: CVData
+  note: string | null
+  created_at: string
+}
+
+type DbCV = {
+  id: string
+  title: string
+  template_id: string
+  current_version_id: string | null
+  versions: DbCVVersion[]
+}
 
 export default function VersionsPage() {
   const params = useParams<{ id: string }>()
@@ -25,12 +41,10 @@ export default function VersionsPage() {
   const router = useRouter()
   const { toast } = useToast()
   
-  const [cv, setCv] = useState<CV | null>(null)
+  const [cv, setCv] = useState<DbCV | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [restoreDialogOpen, setRestoreDialogOpen] = useState(false)
-  const [selectedVersion, setSelectedVersion] = useState<CVVersion | null>(null)
-  
-  const resolvedParams = params; // Declare resolvedParams variable
+  const [selectedVersion, setSelectedVersion] = useState<DbCVVersion | null>(null)
   
   useEffect(() => {
     if (!authLoading && !user) {
@@ -38,27 +52,63 @@ export default function VersionsPage() {
       return
     }
     
-    if (user && params.id) {
-      const loadedCV = getCV(params.id)
-      if (!loadedCV || loadedCV.userId !== user.id) {
+    const loadVersions = async () => {
+      if (!user || !params.id) return
+      
+      try {
+        setIsLoading(true)
+        const response = await fetch(`/api/cvs/${params.id}/versions`)
+        if (!response.ok) {
+          if (response.status === 404 || response.status === 403) {
+            router.push('/dashboard')
+            return
+          }
+          throw new Error('Failed to load versions')
+        }
+        
+        const { cv: loadedCV } = await response.json()
+        setCv(loadedCV)
+      } catch (error) {
+        console.error('Error loading versions:', error)
+        toast({ title: 'Failed to load versions', variant: 'destructive' })
         router.push('/dashboard')
-        return
+      } finally {
+        setIsLoading(false)
       }
-      setCv(loadedCV)
-      setIsLoading(false)
+    }
+    
+    if (user && params.id) {
+      loadVersions()
     }
   }, [authLoading, user, params.id, router])
   
   const handleRestore = () => {
     if (!cv || !selectedVersion) return
     
-    const updatedCV = restoreVersion(cv.id, selectedVersion.id)
-    if (updatedCV) {
-      setCv(updatedCV)
-      toast({ title: `Restored to version ${selectedVersion.version}` })
+    const restoreVersion = async () => {
+      try {
+        const response = await fetch(`/api/cvs/${cv.id}/versions`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ versionId: selectedVersion.id }),
+        })
+        
+        if (!response.ok) {
+          throw new Error('Failed to restore version')
+        }
+        
+        const { cv: updated } = await response.json()
+        setCv((prev) => prev ? { ...prev, current_version_id: updated?.current_version_id || selectedVersion.id } : prev)
+        toast({ title: `Restored to version ${selectedVersion.version}` })
+      } catch {
+        toast({ title: 'Failed to restore version', variant: 'destructive' })
+      } finally {
+        setRestoreDialogOpen(false)
+        setSelectedVersion(null)
+      }
     }
-    setRestoreDialogOpen(false)
-    setSelectedVersion(null)
+    
+    restoreVersion()
   }
   
   const formatDate = (dateStr: string) => {
@@ -125,7 +175,7 @@ export default function VersionsPage() {
         
         <div className="space-y-4">
           {sortedVersions.map((version) => {
-            const isActive = version.id === cv.currentVersionId
+            const isActive = version.id === cv.current_version_id
             
             return (
               <Card key={version.id} className={isActive ? 'ring-2 ring-primary' : ''}>
@@ -156,20 +206,17 @@ export default function VersionsPage() {
                   </div>
                   <CardDescription className="flex items-center gap-2">
                     <Clock className="h-3 w-3" />
-                    {formatDate(version.createdAt)}
-                    {version.updatedAt !== version.createdAt && (
-                      <span className="text-xs">(edited {formatDate(version.updatedAt)})</span>
-                    )}
+                    {formatDate(version.created_at)}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     <span>{version.data.basics.name || 'Unnamed'}</span>
-                    <span>•</span>
+                    <span>|</span>
                     <span>{version.data.experience.length} experiences</span>
-                    <span>•</span>
+                    <span>|</span>
                     <span>{version.data.education.length} education entries</span>
-                    <span>•</span>
+                    <span>|</span>
                     <span>{version.data.skills.reduce((acc, g) => acc + g.skills.length, 0)} skills</span>
                   </div>
                   {version.note && (
@@ -190,8 +237,8 @@ export default function VersionsPage() {
           <DialogHeader>
             <DialogTitle>Restore Version {selectedVersion?.version}?</DialogTitle>
             <DialogDescription>
-              This will set version {selectedVersion?.version} as your current working version. 
-              Your current changes will still be saved as the latest version.
+              This will set version {selectedVersion?.version} as your current working version.
+              You can switch to another version at any time.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

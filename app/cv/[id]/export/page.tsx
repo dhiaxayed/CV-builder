@@ -3,8 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
-import { CV, getCV, generateShareToken, revokeShareToken } from '@/lib/storage'
-import { generateLatex } from '@/lib/latex/generator'
+import { CVData } from '@/lib/types/cv'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -14,14 +13,21 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/hooks/use-toast'
 import { ArrowLeft, Download, FileText, Share2, Copy, ExternalLink, Code, FileDown } from 'lucide-react'
 
+type DbCV = {
+  id: string
+  title: string
+  template_id: string
+  is_public: boolean
+  share_token: string | null
+  data: CVData
+}
+
 export default function ExportPage() {
   const params = useParams<{ id: string }>()
   const { user, isLoading: authLoading } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
-  const resolvedParams = params; // Declare resolvedParams
-  
-  const [cv, setCv] = useState<CV | null>(null)
+  const [cv, setCv] = useState<DbCV | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [shareUrl, setShareUrl] = useState('')
   
@@ -31,74 +37,112 @@ export default function ExportPage() {
       return
     }
     
-    if (user && params.id) {
-      const loadedCV = getCV(params.id)
-      if (!loadedCV || loadedCV.userId !== user.id) {
+    const loadCV = async () => {
+      if (!user || !params.id) return
+      
+      try {
+        setIsLoading(true)
+        const response = await fetch(`/api/cvs/${params.id}`)
+        if (!response.ok) {
+          if (response.status === 404 || response.status === 403) {
+            router.push('/dashboard')
+            return
+          }
+          throw new Error('Failed to load CV')
+        }
+        
+        const { cv: loadedCV } = await response.json()
+        setCv(loadedCV)
+        if (loadedCV.share_token && loadedCV.is_public) {
+          setShareUrl(`${window.location.origin}/share/${loadedCV.share_token}`)
+        }
+      } catch (error) {
+        console.error('Error loading CV:', error)
+        toast({ title: 'Failed to load CV', variant: 'destructive' })
         router.push('/dashboard')
-        return
+      } finally {
+        setIsLoading(false)
       }
-      setCv(loadedCV)
-      if (loadedCV.shareToken && loadedCV.isPublic) {
-        setShareUrl(`${window.location.origin}/share/${loadedCV.shareToken}`)
-      }
-      setIsLoading(false)
+    }
+    
+    if (user && params.id) {
+      loadCV()
     }
   }, [authLoading, user, params.id, router])
   
-  const handleDownloadLatex = () => {
-    if (!cv) return
+  const downloadFile = async (format: 'pdf' | 'latex' | 'json') => {
+    if (!cv?.data) return
     
-    const currentVersion = cv.versions.find(v => v.id === cv.currentVersionId)
-    if (!currentVersion) return
-    
-    const latex = generateLatex(currentVersion.data, cv.templateId)
-    const blob = new Blob([latex], { type: 'text/plain' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    const fileName = `${currentVersion.data.basics.name.replace(/\s+/g, '_') || 'cv'}_${cv.title.replace(/\s+/g, '_')}.tex`
-    a.download = fileName
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-    toast({ title: 'LaTeX file downloaded' })
-  }
-  
-  const handleDownloadJSON = () => {
-    if (!cv) return
-    
-    const currentVersion = cv.versions.find(v => v.id === cv.currentVersionId)
-    if (!currentVersion) return
-    
-    const blob = new Blob([JSON.stringify(currentVersion.data, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${currentVersion.data.basics.name.replace(/\s+/g, '_') || 'cv'}_data.json`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-    toast({ title: 'JSON data downloaded' })
-  }
-  
-  const toggleSharing = (enabled: boolean) => {
-    if (!cv) return
-    
-    if (enabled) {
-      const token = generateShareToken(cv.id)
-      if (token) {
-        const url = `${window.location.origin}/share/${token}`
-        setShareUrl(url)
-        setCv({ ...cv, shareToken: token, isPublic: true })
-        toast({ title: 'Share link created' })
+    try {
+      const response = await fetch('/api/pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cvData: cv.data,
+          templateId: cv.template_id,
+          title: cv.title,
+          format,
+        }),
+      })
+      
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}))
+        throw new Error(error.message || 'Failed to generate file')
       }
-    } else {
-      revokeShareToken(cv.id)
-      setShareUrl('')
-      setCv({ ...cv, shareToken: undefined, isPublic: false })
-      toast({ title: 'Share link disabled' })
+      
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const baseName = `resume_${cv.data.basics.name.replace(/\s+/g, '_') || 'cv'}_${cv.title.replace(/\s+/g, '_')}`
+      const extension = format === 'latex' ? 'tex' : format
+      a.download = `${baseName}.${extension}`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      
+      const label = format === 'pdf' ? 'PDF' : format === 'latex' ? 'LaTeX' : 'JSON'
+      toast({ title: `${label} file downloaded` })
+    } catch (error) {
+      toast({ 
+        title: error instanceof Error ? error.message : 'Failed to download file', 
+        variant: 'destructive' 
+      })
+    }
+  }
+  
+  const toggleSharing = async (enabled: boolean) => {
+    if (!cv) return
+    
+    try {
+      const response = await fetch(`/api/cvs/${cv.id}/share`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isPublic: enabled }),
+      })
+      
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}))
+        throw new Error(error.message || 'Failed to update sharing')
+      }
+      
+      const { shareToken } = await response.json()
+      if (enabled && shareToken) {
+        const url = `${window.location.origin}/share/${shareToken}`
+        setShareUrl(url)
+        setCv({ ...cv, share_token: shareToken, is_public: true })
+        toast({ title: 'Share link created' })
+      } else {
+        setShareUrl('')
+        setCv({ ...cv, share_token: null, is_public: false })
+        toast({ title: 'Share link disabled' })
+      }
+    } catch (error) {
+      toast({ 
+        title: error instanceof Error ? error.message : 'Failed to update sharing', 
+        variant: 'destructive' 
+      })
     }
   }
   
@@ -128,9 +172,8 @@ export default function ExportPage() {
   
   if (!cv) return null
   
-  const currentVersion = cv.versions.find(v => v.id === cv.currentVersionId)
-  const suggestedFileName = currentVersion 
-    ? `resume_${currentVersion.data.basics.name.replace(/\s+/g, '_') || 'unnamed'}_${cv.title.replace(/\s+/g, '_')}`
+  const suggestedFileName = cv.data
+    ? `resume_${cv.data.basics.name.replace(/\s+/g, '_') || 'unnamed'}_${cv.title.replace(/\s+/g, '_')}`
     : 'resume'
   
   return (
@@ -177,16 +220,36 @@ export default function ExportPage() {
                 <div className="flex items-start justify-between">
                   <div className="flex items-start gap-3">
                     <div className="p-2 bg-muted rounded-lg">
+                      <FileDown className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-medium">PDF Export (.pdf)</h4>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Download a template-accurate PDF generated directly from your selected LaTeX template.
+                      </p>
+                    </div>
+                  </div>
+                  <Button variant="outline" onClick={() => downloadFile('pdf')}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Download
+                  </Button>
+                </div>
+              </div>
+
+              <div className="p-4 border rounded-lg">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-muted rounded-lg">
                       <Code className="h-5 w-5" />
                     </div>
                     <div>
                       <h4 className="font-medium">LaTeX Source (.tex)</h4>
                       <p className="text-sm text-muted-foreground mt-1">
-                        Download the LaTeX source file. Compile with XeLaTeX or LuaLaTeX to generate a PDF.
+                        Download the LaTeX source to customize the layout or keep a version-controlled backup.
                       </p>
                     </div>
                   </div>
-                  <Button variant="outline" onClick={handleDownloadLatex}>
+                  <Button variant="outline" onClick={() => downloadFile('latex')}>
                     <Download className="h-4 w-4 mr-2" />
                     Download
                   </Button>
@@ -206,29 +269,10 @@ export default function ExportPage() {
                       </p>
                     </div>
                   </div>
-                  <Button variant="outline" onClick={handleDownloadJSON}>
+                  <Button variant="outline" onClick={() => downloadFile('json')}>
                     <Download className="h-4 w-4 mr-2" />
                     Download
                   </Button>
-                </div>
-              </div>
-              
-              <div className="p-4 border rounded-lg bg-muted/30">
-                <div className="flex items-start gap-3">
-                  <div className="p-2 bg-muted rounded-lg">
-                    <FileText className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h4 className="font-medium">PDF Generation</h4>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      To generate a PDF, download the LaTeX file and compile it using a LaTeX editor like 
-                      <a href="https://www.overleaf.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline mx-1">Overleaf</a>
-                      or a local TeX installation.
-                    </p>
-                    <div className="mt-2 text-xs text-muted-foreground">
-                      <strong>Tip:</strong> Use XeLaTeX or LuaLaTeX for best font rendering.
-                    </div>
-                  </div>
                 </div>
               </div>
               
@@ -262,12 +306,12 @@ export default function ExportPage() {
                   </p>
                 </div>
                 <Switch
-                  checked={cv.isPublic}
+                  checked={cv.is_public}
                   onCheckedChange={toggleSharing}
                 />
               </div>
               
-              {cv.isPublic && shareUrl && (
+              {cv.is_public && shareUrl && (
                 <div className="space-y-2">
                   <Label>Share URL</Label>
                   <div className="flex gap-2">

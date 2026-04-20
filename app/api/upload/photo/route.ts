@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { getSessionUser, updateUser } from '@/lib/db/users'
-import { updateCVPhoto, getCVWithCurrentVersion, updateCVData } from '@/lib/db/cvs'
+import { updateCVPhoto, getCV, getCVWithCurrentVersion, updateCVData } from '@/lib/db/cvs'
 import { CVData } from '@/lib/types/cv'
 import { nanoid } from 'nanoid'
 
@@ -93,6 +93,11 @@ export async function POST(request: NextRequest) {
     if (target === 'profile') {
       await updateUser(user.id, { photo_url: dataUrl })
     } else if (target === 'cv' && cvId) {
+      const cv = await getCV(cvId)
+      if (!cv || cv.user_id !== user.id) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+      }
+
       // Update photo_url column for backward compatibility
       await updateCVPhoto(cvId, dataUrl)
       
@@ -152,8 +157,13 @@ export async function DELETE(request: NextRequest) {
     const { target, cvId } = await request.json()
     
     if (target === 'profile') {
-      await updateUser(user.id, { photo_url: undefined })
+      await updateUser(user.id, { photo_url: null })
     } else if (target === 'cv' && cvId) {
+      const cv = await getCV(cvId)
+      if (!cv || cv.user_id !== user.id) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+      }
+
       await updateCVPhoto(cvId, null)
     }
     

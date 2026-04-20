@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { getSessionUser } from '@/lib/db/users'
-import { getCV, duplicateCV } from '@/lib/db/cvs'
+import { getCV, duplicateCV, getUserCVs } from '@/lib/db/cvs'
 
 export async function POST(
   request: NextRequest,
@@ -19,6 +19,18 @@ export async function POST(
     const user = await getSessionUser(sessionToken)
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    
+    // Check user tier and enforce free tier limit (max 1 CV)
+    const userTier = user.preferences?.tier || 'free'
+    if (userTier === 'free') {
+      const existingCVs = await getUserCVs(user.id)
+      if (existingCVs && existingCVs.length >= 1) {
+        return NextResponse.json(
+          { error: 'Free tier limit reached. Please upgrade to Pro to create unlimited CVs.' },
+          { status: 403 }
+        )
+      }
     }
     
     const cv = await getCV(id)

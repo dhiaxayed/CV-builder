@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   // Check for our custom session cookie
   const sessionToken = request.cookies.get('session')?.value
   const isAuthenticated = !!sessionToken

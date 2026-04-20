@@ -90,9 +90,36 @@ export function SectionBasics({ data, onChange, cvId }: SectionBasicsProps) {
     }
   }
   
-  const handleRemovePhoto = () => {
-    onChange({ ...data, photoUrl: undefined })
-    toast({ title: 'Photo removed' })
+  const handleRemovePhoto = async () => {
+    if (!data.photoUrl) return
+    
+    setIsUploading(true)
+    
+    try {
+      if (cvId) {
+        const response = await fetch('/api/upload/photo', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target: 'cv', cvId }),
+        })
+        
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({}))
+          throw new Error(error.message || 'Failed to remove photo')
+        }
+      }
+      
+      onChange({ ...data, photoUrl: undefined })
+      toast({ title: 'Photo removed' })
+    } catch (error) {
+      toast({ 
+        title: error instanceof Error ? error.message : 'Failed to remove photo', 
+        variant: 'destructive' 
+      })
+    } finally {
+      setIsUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
   }
   
   const getInitials = (name: string) => {
@@ -154,6 +181,7 @@ export function SectionBasics({ data, onChange, cvId }: SectionBasicsProps) {
                   size="sm"
                   onClick={handleRemovePhoto}
                   className="text-destructive hover:text-destructive"
+                  disabled={isUploading}
                 >
                   <Trash2 className="h-4 w-4 mr-1" />
                   Remove

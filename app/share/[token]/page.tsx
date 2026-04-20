@@ -2,30 +2,64 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { CV, getCVByShareToken } from '@/lib/storage'
+import { CVData } from '@/lib/types/cv'
 import { CVPreview } from '@/components/cv-editor/cv-preview'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { FileText, AlertCircle, ArrowLeft } from 'lucide-react'
 
+interface SharedCVVersion {
+  id: string
+  data: CVData
+}
+
+interface SharedCV {
+  id: string
+  template_id: string
+  current_version?: SharedCVVersion
+}
+
 export default function SharedCVPage() {
   const params = useParams<{ token: string }>()
   const router = useRouter()
-  const [cv, setCv] = useState<CV | null>(null)
+  const [cv, setCv] = useState<SharedCV | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   
   useEffect(() => {
-    if (params.token) {
-      const sharedCV = getCVByShareToken(params.token)
-      if (sharedCV) {
-        setCv(sharedCV)
-      } else {
+    const loadSharedCV = async () => {
+      if (!params.token) return
+      
+      try {
+        setIsLoading(true)
+        setNotFound(false)
+        
+        const response = await fetch(`/api/share/${params.token}`)
+        if (response.status === 404) {
+          setNotFound(true)
+          return
+        }
+        
+        if (!response.ok) {
+          throw new Error('Failed to load shared CV')
+        }
+        
+        const { cv: sharedCV } = await response.json()
+        if (sharedCV) {
+          setCv(sharedCV)
+        } else {
+          setNotFound(true)
+        }
+      } catch (error) {
+        console.error('Error loading shared CV:', error)
         setNotFound(true)
+      } finally {
+        setIsLoading(false)
       }
-      setIsLoading(false)
     }
+    
+    loadSharedCV()
   }, [params.token])
   
   if (isLoading) {
@@ -75,7 +109,7 @@ export default function SharedCVPage() {
   
   if (!cv) return null
   
-  const currentVersion = cv.versions.find(v => v.id === cv.currentVersionId)
+  const currentVersion = cv.current_version
   if (!currentVersion) return null
   
   return (
@@ -107,7 +141,7 @@ export default function SharedCVPage() {
         
         <CVPreview 
           data={currentVersion.data} 
-          templateId={cv.templateId}
+          templateId={cv.template_id}
           className="min-h-[800px]"
         />
         

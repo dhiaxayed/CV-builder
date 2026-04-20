@@ -43,7 +43,10 @@ export async function createUser(email: string, name?: string): Promise<DbUser> 
   return data as DbUser
 }
 
-export async function updateUser(id: string, updates: { name?: string; photo_url?: string }): Promise<DbUser | null> {
+export async function updateUser(
+  id: string,
+  updates: { name?: string; photo_url?: string | null }
+): Promise<DbUser | null> {
   if (!supabase || !isDatabaseConfigured()) return null
   
   const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() }

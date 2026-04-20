@@ -1,0 +1,14 @@
+services:
+  cv-builder-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cv-builder-app
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    env_file:
+      - .env.production
+    environment:
+      LATEX_CMD: xelatex
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3001}

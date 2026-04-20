@@ -39,6 +39,7 @@ export function CVPreview({ data, templateId, className }: CVPreviewProps) {
   const certifications = data?.certifications || []
   const awards = data?.awards || []
   const languages = data?.languages || []
+  const photoUrl = basics.photoUrl
   
   // Template-specific styles
   const getTemplateStyles = () => {
@@ -102,6 +103,20 @@ export function CVPreview({ data, templateId, className }: CVPreviewProps) {
           itemMeta: 'text-sm text-gray-500',
           bullet: 'text-sm text-gray-700 ml-4',
         }
+      case 'banking':
+        return {
+          container: 'font-serif',
+          header: 'mb-6 border-b-2 border-slate-800 pb-4',
+          name: 'text-3xl font-bold text-slate-900 tracking-wide',
+          title: 'text-base uppercase tracking-[0.2em] text-slate-600 mt-2',
+          contact: 'text-sm text-slate-500 mt-3 space-y-0.5',
+          section: 'mb-5',
+          sectionTitle: 'text-xs font-bold text-slate-900 uppercase tracking-[0.25em] border-b border-slate-400 pb-1 mb-3',
+          itemTitle: 'font-bold text-slate-900',
+          itemSubtitle: 'text-slate-700',
+          itemMeta: 'text-sm text-slate-500',
+          bullet: 'text-sm text-slate-700 ml-4',
+        }
       case 'creative':
         return {
           container: 'font-sans',
@@ -115,6 +130,20 @@ export function CVPreview({ data, templateId, className }: CVPreviewProps) {
           itemSubtitle: 'text-gray-600',
           itemMeta: 'text-sm text-blue-500',
           bullet: 'text-sm text-gray-700 ml-4',
+        }
+      case 'elegant':
+        return {
+          container: 'font-serif',
+          header: 'mb-6 border-l-4 border-rose-300 pl-4',
+          name: 'text-3xl font-semibold text-stone-900',
+          title: 'text-lg text-rose-500 mt-1 italic',
+          contact: 'text-sm text-stone-500 mt-3 space-y-0.5',
+          section: 'mb-5',
+          sectionTitle: 'text-sm font-semibold text-stone-900 uppercase tracking-[0.2em] border-b border-rose-200 pb-1 mb-3',
+          itemTitle: 'font-semibold text-stone-900',
+          itemSubtitle: 'text-stone-700',
+          itemMeta: 'text-sm text-stone-500 italic',
+          bullet: 'text-sm text-stone-700 ml-4',
         }
       case 'academic':
         return {
@@ -144,6 +173,20 @@ export function CVPreview({ data, templateId, className }: CVPreviewProps) {
           itemMeta: 'text-xs text-gray-500 font-mono',
           bullet: 'text-sm text-gray-700 ml-4',
         }
+      case 'compact':
+        return {
+          container: 'font-sans',
+          header: 'mb-4 border-b border-gray-300 pb-2',
+          name: 'text-xl font-bold text-gray-900',
+          title: 'text-sm uppercase tracking-wide text-gray-600 mt-1',
+          contact: 'text-[10px] text-gray-500 mt-2 flex flex-wrap gap-1',
+          section: 'mb-3',
+          sectionTitle: 'text-[10px] font-bold text-gray-900 uppercase tracking-wider border-b border-gray-200 pb-1 mb-2',
+          itemTitle: 'font-semibold text-gray-900 text-sm',
+          itemSubtitle: 'text-gray-700 text-xs',
+          itemMeta: 'text-[10px] text-gray-500',
+          bullet: 'text-xs text-gray-700 ml-3',
+        }
       case 'executive':
         return {
           container: 'font-serif',
@@ -157,6 +200,76 @@ export function CVPreview({ data, templateId, className }: CVPreviewProps) {
           itemSubtitle: 'text-gray-700',
           itemMeta: 'text-sm text-gray-500 italic',
           bullet: 'text-sm text-gray-700 ml-4',
+        }
+      case 'fancy':
+        return {
+          container: 'font-sans',
+          header: 'text-center mb-6 border-b-2 border-fuchsia-200 pb-4',
+          name: 'text-3xl font-bold text-fuchsia-700',
+          title: 'text-lg text-fuchsia-500 mt-1',
+          contact: 'text-sm text-gray-500 mt-3 flex flex-wrap justify-center gap-2',
+          section: 'mb-5',
+          sectionTitle: 'text-sm font-bold text-fuchsia-700 uppercase tracking-wide border-b border-fuchsia-200 pb-1 mb-3',
+          itemTitle: 'font-bold text-gray-900',
+          itemSubtitle: 'text-gray-700',
+          itemMeta: 'text-sm text-fuchsia-500',
+          bullet: 'text-sm text-gray-700 ml-4',
+        }
+      case 'bold':
+        return {
+          container: 'font-sans',
+          header: 'mb-6 -mx-8 bg-slate-950 px-8 py-6 text-white',
+          name: 'text-3xl font-black uppercase tracking-wide text-white',
+          title: 'text-lg text-gray-200 mt-2',
+          contact: 'text-xs text-gray-300 mt-3 flex flex-wrap gap-2',
+          section: 'mb-5',
+          sectionTitle: 'text-sm font-black text-slate-900 uppercase tracking-[0.25em] border-b-2 border-slate-900 pb-1 mb-3',
+          itemTitle: 'font-black text-slate-900',
+          itemSubtitle: 'text-slate-700',
+          itemMeta: 'text-sm text-slate-500',
+          bullet: 'text-sm text-slate-700 ml-4',
+        }
+      case 'infographic':
+        return {
+          container: 'font-sans',
+          header: 'text-center mb-6 -mx-8 bg-sky-600 px-8 py-6 text-white',
+          name: 'text-3xl font-bold text-white',
+          title: 'text-lg text-sky-100 mt-1',
+          contact: 'text-xs text-sky-50 mt-3 flex flex-wrap justify-center gap-2',
+          section: 'mb-5',
+          sectionTitle: 'text-sm font-bold text-sky-700 uppercase tracking-wide border-b border-sky-300 pb-1 mb-3',
+          itemTitle: 'font-bold text-slate-900',
+          itemSubtitle: 'text-slate-700',
+          itemMeta: 'text-sm text-sky-600',
+          bullet: 'text-sm text-slate-700 ml-4',
+        }
+      case 'casual':
+        return {
+          container: 'font-sans',
+          header: 'mb-6 border-b-2 border-emerald-300 pb-4',
+          name: 'text-3xl font-bold text-emerald-800',
+          title: 'text-lg text-emerald-600 mt-1',
+          contact: 'text-sm text-gray-500 mt-3 flex flex-wrap gap-2',
+          section: 'mb-5',
+          sectionTitle: 'text-sm font-bold text-emerald-800 uppercase tracking-wide border-b border-emerald-200 pb-1 mb-3',
+          itemTitle: 'font-semibold text-gray-900',
+          itemSubtitle: 'text-gray-700',
+          itemMeta: 'text-sm text-emerald-600',
+          bullet: 'text-sm text-gray-700 ml-4',
+        }
+      case 'vintage':
+        return {
+          container: 'bg-amber-50 font-serif',
+          header: 'text-center mb-6 border-b-2 border-amber-800 pb-4',
+          name: 'text-3xl font-bold text-amber-950 tracking-wide',
+          title: 'text-lg text-amber-800 mt-1 italic',
+          contact: 'text-sm text-amber-900/70 mt-3 flex flex-wrap justify-center gap-2',
+          section: 'mb-5',
+          sectionTitle: 'text-sm font-bold text-amber-950 uppercase tracking-[0.2em] border-b border-amber-700 pb-1 mb-3',
+          itemTitle: 'font-bold text-amber-950',
+          itemSubtitle: 'text-amber-900',
+          itemMeta: 'text-sm text-amber-800 italic',
+          bullet: 'text-sm text-amber-900 ml-4',
         }
       default:
         return {
@@ -176,6 +289,9 @@ export function CVPreview({ data, templateId, className }: CVPreviewProps) {
   }
   
   const styles = getTemplateStyles()
+  const isCentered = styles.header.includes('text-center')
+  const photoWrapClass = isCentered ? 'flex justify-center mb-3' : 'flex mb-3'
+  const photoClass = 'h-20 w-20 rounded-full object-cover border border-gray-200'
   
   return (
     <Card className={cn("bg-white shadow-lg", className)}>
@@ -183,6 +299,15 @@ export function CVPreview({ data, templateId, className }: CVPreviewProps) {
         <div className={cn("p-8 min-h-full", styles.container)} style={{ fontSize: '11px', lineHeight: '1.4' }}>
           {/* Header */}
           <header className={styles.header}>
+            {photoUrl && (
+              <div className={photoWrapClass}>
+                <img
+                  src={photoUrl}
+                  alt={basics.name ? `${basics.name} photo` : 'Profile photo'}
+                  className={photoClass}
+                />
+              </div>
+            )}
             <h1 className={styles.name}>{basics.name || 'Your Name'}</h1>
             {basics.title && <p className={styles.title}>{basics.title}</p>}
             <div className={styles.contact}>
@@ -215,7 +340,7 @@ export function CVPreview({ data, templateId, className }: CVPreviewProps) {
                         <p className={styles.itemSubtitle}>{exp.company}{exp.location && `, ${exp.location}`}</p>
                       </div>
                       <span className={styles.itemMeta}>
-                        {formatDate(exp.startDate)} – {exp.current ? 'Present' : formatDate(exp.endDate)}
+                        {formatDate(exp.startDate)} - {exp.current ? 'Present' : formatDate(exp.endDate)}
                       </span>
                     </div>
                     {exp.technologies && exp.technologies.length > 0 && (
@@ -225,7 +350,7 @@ export function CVPreview({ data, templateId, className }: CVPreviewProps) {
                     )}
                     <ul className="mt-2 space-y-1">
                       {(exp.bullets || []).filter(b => b.trim()).map((bullet, i) => (
-                        <li key={i} className={styles.bullet}>• {bullet}</li>
+                        <li key={i} className={styles.bullet}>{bullet}</li>
                       ))}
                     </ul>
                   </div>
@@ -250,7 +375,7 @@ export function CVPreview({ data, templateId, className }: CVPreviewProps) {
                         </p>
                       </div>
                       <span className={styles.itemMeta}>
-                        {formatDate(edu.startDate)} – {formatDate(edu.endDate)}
+                        {formatDate(edu.startDate)} - {formatDate(edu.endDate)}
                       </span>
                     </div>
                     {edu.highlights && edu.highlights.length > 0 && (
@@ -297,7 +422,7 @@ export function CVPreview({ data, templateId, className }: CVPreviewProps) {
                     {(project.bullets || []).filter(b => b.trim()).length > 0 && (
                       <ul className="mt-1 space-y-0.5">
                         {(project.bullets || []).filter(b => b.trim()).map((bullet, i) => (
-                          <li key={i} className={styles.bullet}>• {bullet}</li>
+                          <li key={i} className={styles.bullet}>{bullet}</li>
                         ))}
                       </ul>
                     )}
@@ -315,7 +440,7 @@ export function CVPreview({ data, templateId, className }: CVPreviewProps) {
                 {certifications.map((cert) => (
                   <p key={cert.id} className="text-sm">
                     <span className="font-semibold text-gray-900">{cert.name}</span>
-                    <span className="text-gray-700"> – {cert.issuer}, {formatDate(cert.date)}</span>
+                    <span className="text-gray-700"> - {cert.issuer}, {formatDate(cert.date)}</span>
                   </p>
                 ))}
               </div>
@@ -330,8 +455,8 @@ export function CVPreview({ data, templateId, className }: CVPreviewProps) {
                 {awards.map((award) => (
                   <p key={award.id} className="text-sm">
                     <span className="font-semibold text-gray-900">{award.title}</span>
-                    <span className="text-gray-700"> – {award.issuer}, {award.date}</span>
-                    {award.description && <span className="text-gray-600"> – {award.description}</span>}
+                    <span className="text-gray-700"> - {award.issuer}, {award.date}</span>
+                    {award.description && <span className="text-gray-600"> - {award.description}</span>}
                   </p>
                 ))}
               </div>

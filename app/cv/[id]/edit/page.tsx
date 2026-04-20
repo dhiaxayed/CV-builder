@@ -36,6 +36,7 @@ import {
   Settings2,
   Shield,
   FileSearch,
+  Sparkles,
   History,
   FileText,
   Loader2,
@@ -52,6 +53,7 @@ import { SectionLanguages } from '@/components/cv-editor/section-languages'
 import { CVPreview } from '@/components/cv-editor/cv-preview'
 import { ATSPanel } from '@/components/cv-editor/ats-panel'
 import { JDMatchPanel } from '@/components/cv-editor/jd-match-panel'
+import { AIAssistantPanel } from '@/components/cv-editor/ai-assistant-panel'
 
 // Template definitions - 16 Professional Templates
 const TEMPLATES = [
@@ -123,12 +125,15 @@ export default function CVEditorPage() {
   const [cvData, setCvData] = useState<CVData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [isSavingVersion, setIsSavingVersion] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [activeView, setActiveView] = useState<'form' | 'latex'>('form')
-  const [rightPanel, setRightPanel] = useState<'preview' | 'ats' | 'jd'>('preview')
+  const [rightPanel, setRightPanel] = useState<'preview' | 'ats' | 'jd' | 'ai'>('preview')
   const [latexCode, setLatexCode] = useState('')
   const [saveVersionDialogOpen, setSaveVersionDialogOpen] = useState(false)
   const [versionNote, setVersionNote] = useState('')
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
+  const [lastVersionSavedLabel, setLastVersionSavedLabel] = useState<string | null>(null)
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
   // Load CV data from database
@@ -159,6 +164,7 @@ export default function CVEditorPage() {
       const { cv: loadedCV } = await response.json()
       setCv(loadedCV)
       setCvData(loadedCV.data || DEFAULT_CV_DATA)
+      setLastSavedAt(loadedCV.updated_at || new Date().toISOString())
     } catch (error) {
       console.error('Error loading CV:', error)
       toast({ title: 'Failed to load CV', variant: 'destructive' })
@@ -210,6 +216,7 @@ export default function CVEditorPage() {
       if (!response.ok) throw new Error('Failed to save')
       
       setHasUnsavedChanges(false)
+      setLastSavedAt(new Date().toISOString())
       toast({ title: 'Changes saved' })
     } catch {
       toast({ title: 'Failed to save changes', variant: 'destructive' })
@@ -220,15 +227,147 @@ export default function CVEditorPage() {
   
   // Handle data changes
   const handleDataChange = (updates: Partial<CVData>) => {
-    if (!cvData) return
-    setCvData({ ...cvData, ...updates })
+    setCvData((current) => {
+      if (!current) return current
+      return { ...current, ...updates }
+    })
     setHasUnsavedChanges(true)
+  }
+
+  const applyAISummary = (summary: string) => {
+    setCvData((current) => {
+      if (!current) return current
+      return { ...current, summary }
+    })
+    setHasUnsavedChanges(true)
+    toast({ title: 'AI summary applied' })
+  }
+
+  const applyAISkills = (skillsToAdd: string[]) => {
+    const normalizedSkills = Array.from(
+      new Set(skillsToAdd.map((skill) => skill.trim()).filter(Boolean))
+    )
+
+    if (normalizedSkills.length === 0) return
+
+    setCvData((current) => {
+      if (!current) return current
+
+      const existingIndex = current.skills.findIndex((group) =>
+        ['target role keywords', 'core skills', 'technical skills'].includes(group.category.toLowerCase())
+      )
+
+      if (existingIndex >= 0) {
+        const updatedSkills = [...current.skills]
+        const existingGroup = updatedSkills[existingIndex]
+        updatedSkills[existingIndex] = {
+          ...existingGroup,
+          skills: Array.from(new Set([...(existingGroup.skills || []), ...normalizedSkills])),
+        }
+
+        return { ...current, skills: updatedSkills }
+      }
+
+      return {
+        ...current,
+        skills: [
+          ...current.skills,
+          {
+            id: `ai-skills-${Date.now()}`,
+            category: 'Target Role Keywords',
+            skills: normalizedSkills,
+          },
+        ],
+      }
+    })
+
+    setHasUnsavedChanges(true)
+    toast({ title: 'AI skills added' })
+  }
+
+  const applyAIExperienceBullets = (experienceId: string, bullets: string[]) => {
+    const cleanBullets = bullets.map((bullet) => bullet.trim()).filter(Boolean)
+
+    if (cleanBullets.length === 0) return
+
+    setCvData((current) => {
+      if (!current) return current
+
+      return {
+        ...current,
+        experience: current.experience.map((item) =>
+          item.id === experienceId ? { ...item, bullets: cleanBullets } : item
+        ),
+      }
+    })
+
+    setHasUnsavedChanges(true)
+    toast({ title: 'AI bullets applied' })
+  }
+
+  const applyAITailoredPackage = ({
+    summary,
+    skills,
+    experienceRewrites,
+  }: {
+    summary: string
+    skills: string[]
+    experienceRewrites: Array<{ experienceId: string; bullets: string[] }>
+  }) => {
+    const normalizedSkills = Array.from(new Set(skills.map((skill) => skill.trim()).filter(Boolean)))
+
+    setCvData((current) => {
+      if (!current) return current
+
+      const rewriteMap = new Map(
+        experienceRewrites.map((rewrite) => [
+          rewrite.experienceId,
+          rewrite.bullets.map((bullet) => bullet.trim()).filter(Boolean),
+        ])
+      )
+
+      const existingIndex = current.skills.findIndex((group) =>
+        ['target role keywords', 'core skills', 'technical skills'].includes(group.category.toLowerCase())
+      )
+
+      const updatedSkills = [...current.skills]
+      if (normalizedSkills.length > 0) {
+        if (existingIndex >= 0) {
+          const existingGroup = updatedSkills[existingIndex]
+          updatedSkills[existingIndex] = {
+            ...existingGroup,
+            skills: Array.from(new Set([...(existingGroup.skills || []), ...normalizedSkills])),
+          }
+        } else {
+          updatedSkills.push({
+            id: `ai-skills-${Date.now()}`,
+            category: 'Target Role Keywords',
+            skills: normalizedSkills,
+          })
+        }
+      }
+
+      return {
+        ...current,
+        summary,
+        skills: updatedSkills,
+        experience: current.experience.map((item) =>
+          rewriteMap.has(item.id)
+            ? { ...item, bullets: rewriteMap.get(item.id) || item.bullets }
+            : item
+        ),
+      }
+    })
+
+    setHasUnsavedChanges(true)
+    toast({ title: 'AI tailored package applied' })
   }
   
   // Save as new version
   const handleSaveVersion = async () => {
     if (!cv || !cvData) return
-    
+
+    setIsSavingVersion(true)
     try {
       const response = await fetch(`/api/cvs/${cv.id}/versions`, {
         method: 'POST',
@@ -243,10 +382,24 @@ export default function CVEditorPage() {
       setSaveVersionDialogOpen(false)
       setVersionNote('')
       setHasUnsavedChanges(false)
+      setLastSavedAt(new Date().toISOString())
+      setLastVersionSavedLabel(`Version ${version.version} saved`)
     } catch {
       toast({ title: 'Failed to save version', variant: 'destructive' })
+    } finally {
+      setIsSavingVersion(false)
     }
   }
+
+  const saveStatusLabel = isSaving ? 'Saving changes...' : hasUnsavedChanges ? 'Unsaved changes' : 'All changes saved'
+  const saveStatusTone = isSaving
+    ? 'border-blue-200 bg-blue-50 text-blue-700'
+    : hasUnsavedChanges
+      ? 'border-amber-200 bg-amber-50 text-amber-700'
+      : 'border-green-200 bg-green-50 text-green-700'
+  const formattedSavedTime = lastSavedAt
+    ? new Date(lastSavedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    : null
   
   // Handle template change
   const handleTemplateChange = async (templateId: string) => {
@@ -283,10 +436,14 @@ export default function CVEditorPage() {
     toast({ title: 'LaTeX file downloaded' })
   }
   
-  // Export to PDF (downloads HTML that can be printed to PDF)
+  // Export to PDF (template-accurate LaTeX compilation)
   const handleExportPDF = async () => {
     try {
-      toast({ title: 'Generating printable resume...' })
+      if (!cvData) {
+        throw new Error('CV data is not loaded yet')
+      }
+
+      toast({ title: 'Generating PDF...' })
       
       const response = await fetch('/api/pdf', {
         method: 'POST',
@@ -294,30 +451,28 @@ export default function CVEditorPage() {
         body: JSON.stringify({ 
           cvData, 
           templateId: cv?.template_id,
-          title: cv?.title 
+          title: cv?.title,
+          format: 'pdf',
         }),
       })
       
       if (!response.ok) {
-        const error = await response.json()
+        const error = await response.json().catch(() => ({}))
         throw new Error(error.message || 'Failed to generate PDF')
       }
       
       const blob = await response.blob()
       const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      const baseName = `${cvData.basics.name.replace(/\s+/g, '_') || 'cv'}_${cv?.title?.replace(/\s+/g, '_') || 'resume'}`
+      a.href = url
+      a.download = `${baseName}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
       
-      // Open in new tab for easy printing
-      const printWindow = window.open(url, '_blank')
-      if (printWindow) {
-        printWindow.onload = () => {
-          printWindow.print()
-        }
-      }
-      
-      toast({ 
-        title: 'Resume opened in new tab!',
-        description: 'Use Print (Ctrl+P) and select "Save as PDF" to create your PDF.' 
-      })
+      toast({ title: 'PDF downloaded' })
     } catch (error) {
       toast({ 
         title: error instanceof Error ? error.message : 'Failed to generate PDF', 
@@ -358,18 +513,20 @@ export default function CVEditorPage() {
             <Button variant="ghost" size="icon" onClick={() => router.push('/dashboard')}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <div className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-primary" />
-              <span className="font-semibold">{cv.title}</span>
-              {hasUnsavedChanges && (
-                <span className="text-xs text-muted-foreground">(unsaved changes)</span>
-              )}
+            <div className="flex flex-col">
+              <div className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-primary" />
+                <span className="font-semibold">{cv.title}</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Use Preview to inspect layout, then open AI Assist for review, tailoring, and factual rewrites.
+              </p>
             </div>
           </div>
           
           <div className="flex items-center gap-2">
             <Select value={cv.template_id} onValueChange={handleTemplateChange}>
-              <SelectTrigger className="w-[160px] h-8">
+              <SelectTrigger className="w-40 h-8">
                 <SelectValue placeholder="Template" />
               </SelectTrigger>
               <SelectContent>
@@ -419,6 +576,25 @@ export default function CVEditorPage() {
           </div>
         </div>
       </header>
+
+      <div className="border-b bg-muted/20">
+        <div className="container mx-auto flex flex-wrap items-center gap-2 px-4 py-2 text-xs">
+          <span className={`rounded-full border px-2 py-1 font-medium ${saveStatusTone}`}>
+            {saveStatusLabel}
+          </span>
+          {formattedSavedTime && (
+            <span className="text-muted-foreground">Last saved at {formattedSavedTime}</span>
+          )}
+          {lastVersionSavedLabel && (
+            <span className="rounded-full border border-primary/20 bg-primary/5 px-2 py-1 font-medium text-primary">
+              {lastVersionSavedLabel}
+            </span>
+          )}
+          <span className="text-muted-foreground">
+            Tip: save a version after major AI changes so you can compare role-specific variants later.
+          </span>
+        </div>
+      </div>
       
       {/* Main Content */}
       <div className="flex flex-1 overflow-hidden">
@@ -482,7 +658,7 @@ export default function CVEditorPage() {
                   {latexCode}
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
-                  This is the generated LaTeX source. Download it and compile with XeLaTeX or LuaLaTeX to create your PDF.
+                  This is the generated LaTeX source used to build your PDF export.
                 </p>
               </div>
             )}
@@ -492,7 +668,7 @@ export default function CVEditorPage() {
         {/* Right Panel - Preview / ATS / JD Match */}
         <div className="w-1/2 flex flex-col bg-muted/20">
           <div className="border-b px-4 py-2 flex items-center justify-between bg-muted/30">
-            <Tabs value={rightPanel} onValueChange={(v) => setRightPanel(v as 'preview' | 'ats' | 'jd')}>
+            <Tabs value={rightPanel} onValueChange={(v) => setRightPanel(v as 'preview' | 'ats' | 'jd' | 'ai')}>
               <TabsList className="h-8">
                 <TabsTrigger value="preview" className="text-xs h-7">
                   <Eye className="h-3 w-3 mr-1" />
@@ -505,6 +681,10 @@ export default function CVEditorPage() {
                 <TabsTrigger value="jd" className="text-xs h-7">
                   <FileSearch className="h-3 w-3 mr-1" />
                   JD Match
+                </TabsTrigger>
+                <TabsTrigger value="ai" className="text-xs h-7">
+                  <Sparkles className="h-3 w-3 mr-1" />
+                  AI Assist
                 </TabsTrigger>
               </TabsList>
             </Tabs>
@@ -523,6 +703,16 @@ export default function CVEditorPage() {
             )}
             {rightPanel === 'jd' && (
               <JDMatchPanel data={cvData} />
+            )}
+            {rightPanel === 'ai' && (
+              <AIAssistantPanel
+                cvId={cv.id}
+                data={cvData}
+                onApplySummary={applyAISummary}
+                onAddSkills={applyAISkills}
+                onApplyExperienceBullets={applyAIExperienceBullets}
+                onApplyTailoredPackage={applyAITailoredPackage}
+              />
             )}
           </div>
         </div>
@@ -548,11 +738,12 @@ export default function CVEditorPage() {
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setSaveVersionDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setSaveVersionDialogOpen(false)} disabled={isSavingVersion}>
               Cancel
             </Button>
-            <Button onClick={handleSaveVersion}>
-              Save Version
+            <Button onClick={handleSaveVersion} disabled={isSavingVersion}>
+              {isSavingVersion ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {isSavingVersion ? 'Saving Version...' : 'Save Version'}
             </Button>
           </DialogFooter>
         </DialogContent>

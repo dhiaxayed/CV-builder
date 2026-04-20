@@ -1,11 +1,13 @@
 import { Page, expect } from '@playwright/test';
 
 export async function loginUser(page: Page) {
+    const baseUrl = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3001';
+
     // 1. Visit login page
     await page.goto('/auth/signin');
 
     // 2. Fill in email
-    const email = 'testuser@example.com';
+    const email = `playwright-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
     await page.fill('input[type="email"]', email);
 
     // 3. Intercept the API call
@@ -25,7 +27,8 @@ export async function loginUser(page: Page) {
     }
 
     // 6. Navigate to verification link
-    await page.goto(data.devLink);
+    const normalizedDevLink = data.devLink.replace('http://localhost:3000', baseUrl);
+    await page.goto(normalizedDevLink);
 
     // 7. Wait for dashboard
     await expect(page).toHaveURL(/\/dashboard/);

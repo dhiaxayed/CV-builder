@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { TemplatePreviewCard } from '@/components/template-preview-card'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { FileText, ArrowLeft, ArrowRight, Sparkles, PenLine, CheckCircle2, Loader2 } from 'lucide-react'
@@ -108,30 +109,42 @@ export default function NewCVPage() {
         </div>
       </header>
       
-      <main className="container mx-auto px-4 py-8 max-w-4xl">
+      <main className={cn(
+        'container mx-auto px-4 py-8',
+        step === 'template' ? 'max-w-7xl' : 'max-w-4xl'
+      )}>
         {/* Progress */}
-        <div className="flex items-center justify-center mb-8">
-          <div className="flex items-center gap-2">
-            <div className={cn(
-              "flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium",
-              step === 'start' ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-            )}>
-              {step !== 'start' ? <CheckCircle2 className="h-5 w-5" /> : '1'}
+        <div className="mb-8 flex items-center justify-center">
+          <div className="flex items-start gap-3">
+            <div className="flex flex-col items-center gap-2">
+              <div className={cn(
+                "flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium",
+                step === 'start' ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+              )}>
+                {step !== 'start' ? <CheckCircle2 className="h-5 w-5" /> : '1'}
+              </div>
+              <span className="text-xs text-muted-foreground">Start</span>
             </div>
             <div className="w-16 h-0.5 bg-muted" />
-            <div className={cn(
-              "flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium",
-              step === 'template' ? "bg-primary text-primary-foreground" : 
-              step === 'title' ? "bg-muted text-muted-foreground" : "bg-muted text-muted-foreground"
-            )}>
-              {step === 'title' ? <CheckCircle2 className="h-5 w-5" /> : '2'}
+            <div className="flex flex-col items-center gap-2">
+              <div className={cn(
+                "flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium",
+                step === 'template' ? "bg-primary text-primary-foreground" :
+                step === 'title' ? "bg-muted text-muted-foreground" : "bg-muted text-muted-foreground"
+              )}>
+                {step === 'title' ? <CheckCircle2 className="h-5 w-5" /> : '2'}
+              </div>
+              <span className="text-xs text-muted-foreground">Template</span>
             </div>
             <div className="w-16 h-0.5 bg-muted" />
-            <div className={cn(
-              "flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium",
-              step === 'title' ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-            )}>
-              3
+            <div className="flex flex-col items-center gap-2">
+              <div className={cn(
+                "flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium",
+                step === 'title' ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+              )}>
+                3
+              </div>
+              <span className="text-xs text-muted-foreground">Title</span>
             </div>
           </div>
         </div>
@@ -212,51 +225,52 @@ export default function NewCVPage() {
               <p className="text-muted-foreground">
                 All templates are ATS-optimized for maximum compatibility
               </p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                You can switch templates later in the editor without losing your content.
+              </p>
+            </div>
+
+            <div className="rounded-lg border bg-muted/30 p-4">
+              <p className="text-sm font-medium">
+                Selected template: {TEMPLATES.find((template) => template.id === selectedTemplate)?.name}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Pick the layout that best fits your target role. The content can still be edited and re-styled later.
+              </p>
             </div>
             
             <RadioGroup 
               value={selectedTemplate} 
               onValueChange={setSelectedTemplate}
-              className="grid gap-6 md:grid-cols-4"
+              className="grid gap-6 md:grid-cols-2 xl:grid-cols-4"
             >
               {TEMPLATES.map(template => (
                 <Label key={template.id} htmlFor={template.id} className="cursor-pointer">
-                  <Card className={cn(
-                    "transition-all hover:shadow-md h-full relative",
-                    selectedTemplate === template.id && "ring-2 ring-primary"
-                  )}>
-                    {'popular' in template && template.popular && (
-                      <span className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full">
-                        Popular
-                      </span>
-                    )}
-                    <CardHeader className="pb-2">
-                      <div className="aspect-3/4 bg-muted rounded-md mb-3 flex items-center justify-center">
-                        <FileText className="h-12 w-12 text-muted-foreground/50" />
-                      </div>
-                      <CardTitle className="text-lg">{template.name}</CardTitle>
-                      <CardDescription className="text-sm">
-                        {template.description}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <RadioGroupItem value={template.id} id={template.id} className="sr-only" />
+                  <RadioGroupItem value={template.id} id={template.id} className="sr-only" />
+                  <TemplatePreviewCard
+                    templateId={template.id}
+                    name={template.name}
+                    subtitle={template.description}
+                    popular={template.popular}
+                    selected={selectedTemplate === template.id}
+                    className="h-full"
+                    footer={
                       <div className="flex items-center gap-2">
                         <span className={cn(
-                          "text-xs px-2 py-0.5 rounded-full",
-                          template.category === 'ats' && "bg-green-100 text-green-700",
-                          template.category === 'classic' && "bg-amber-100 text-amber-700",
-                          template.category === 'business' && "bg-blue-100 text-blue-700",
-                          template.category === 'creative' && "bg-pink-100 text-pink-700",
-                          template.category === 'academic' && "bg-purple-100 text-purple-700",
-                          template.category === 'tech' && "bg-cyan-100 text-cyan-700"
+                          'rounded-full px-2 py-0.5 text-xs',
+                          template.category === 'ats' && 'bg-green-100 text-green-700',
+                          template.category === 'classic' && 'bg-amber-100 text-amber-700',
+                          template.category === 'business' && 'bg-blue-100 text-blue-700',
+                          template.category === 'creative' && 'bg-pink-100 text-pink-700',
+                          template.category === 'academic' && 'bg-purple-100 text-purple-700',
+                          template.category === 'tech' && 'bg-cyan-100 text-cyan-700'
                         )}>
                           {template.category}
                         </span>
                         <span className="text-xs text-muted-foreground">ATS-Safe</span>
                       </div>
-                    </CardContent>
-                  </Card>
+                    }
+                  />
                 </Label>
               ))}
             </RadioGroup>

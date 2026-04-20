@@ -40,6 +40,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     
+    // Check user tier and enforce free tier limit (max 1 CV)
+    const userTier = user.preferences?.tier || 'free'
+    if (userTier === 'free') {
+      const existingCVs = await getUserCVs(user.id)
+      if (existingCVs && existingCVs.length >= 1) {
+        return NextResponse.json(
+          { error: 'Free tier limit reached. Please upgrade to Pro to create unlimited CVs.' },
+          { status: 403 }
+        )
+      }
+    }
+    
     const { title, templateId, initialData } = await request.json()
     
     const cv = await createCV(user.id, title || 'Untitled CV', templateId, initialData)
