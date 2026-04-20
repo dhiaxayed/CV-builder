@@ -21,7 +21,7 @@ export async function GET() {
     
     return NextResponse.json({ cvs })
   } catch (error) {
-    console.error('[v0] Error getting CVs:', error)
+    console.error('Error getting CVs:', error)
     return NextResponse.json({ error: 'Failed to get CVs' }, { status: 500 })
   }
 }
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
     
     return NextResponse.json({ cv })
   } catch (error) {
-    console.error('[v0] Error creating CV:', error)
+    console.error('Error creating CV:', error)
     return NextResponse.json({ error: 'Failed to create CV' }, { status: 500 })
   }
 }

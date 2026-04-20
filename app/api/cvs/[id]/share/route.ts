@@ -32,7 +32,7 @@ export async function POST(
     
     return NextResponse.json(result)
   } catch (error) {
-    console.error('[v0] Error updating sharing:', error)
+    console.error('Error updating sharing:', error)
     return NextResponse.json({ error: 'Failed to update sharing' }, { status: 500 })
   }
 }

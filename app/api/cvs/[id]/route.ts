@@ -51,7 +51,7 @@ export async function GET(
     
     return NextResponse.json({ cv: cvWithData })
   } catch (error) {
-    console.error('[v0] Error getting CV:', error)
+    console.error('Error getting CV:', error)
     return NextResponse.json({ error: 'Failed to get CV' }, { status: 500 })
   }
 }
@@ -96,7 +96,7 @@ export async function PUT(
     
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('[v0] Error updating CV:', error)
+    console.error('Error updating CV:', error)
     return NextResponse.json({ error: 'Failed to update CV' }, { status: 500 })
   }
 }
@@ -128,7 +128,7 @@ export async function DELETE(
     
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('[v0] Error deleting CV:', error)
+    console.error('Error deleting CV:', error)
     return NextResponse.json({ error: 'Failed to delete CV' }, { status: 500 })
   }
 }

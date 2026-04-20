@@ -42,7 +42,7 @@ export async function POST(
     
     return NextResponse.json({ cv: newCV })
   } catch (error) {
-    console.error('[v0] Error duplicating CV:', error)
+    console.error('Error duplicating CV:', error)
     return NextResponse.json({ error: 'Failed to duplicate CV' }, { status: 500 })
   }
 }

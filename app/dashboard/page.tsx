@@ -84,7 +84,7 @@ export default function DashboardPage() {
         setCvs(data.cvs || [])
       }
     } catch (error) {
-      console.error('[v0] Error fetching CVs:', error)
+      console.error('Error fetching CVs:', error)
     } finally {
       setIsLoading(false)
     }

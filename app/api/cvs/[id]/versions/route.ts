@@ -28,7 +28,7 @@ export async function GET(
     
     return NextResponse.json({ cv })
   } catch (error) {
-    console.error('[v0] Error getting versions:', error)
+    console.error('Error getting versions:', error)
     return NextResponse.json({ error: 'Failed to get versions' }, { status: 500 })
   }
 }
@@ -62,7 +62,7 @@ export async function POST(
     
     return NextResponse.json({ version })
   } catch (error) {
-    console.error('[v0] Error creating version:', error)
+    console.error('Error creating version:', error)
     return NextResponse.json({ error: 'Failed to create version' }, { status: 500 })
   }
 }
@@ -96,7 +96,7 @@ export async function PUT(
     
     return NextResponse.json({ cv: updatedCV })
   } catch (error) {
-    console.error('[v0] Error restoring version:', error)
+    console.error('Error restoring version:', error)
     return NextResponse.json({ error: 'Failed to restore version' }, { status: 500 })
   }
 }

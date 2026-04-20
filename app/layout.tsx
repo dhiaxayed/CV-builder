@@ -12,7 +12,7 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: 'CV Builder - Create ATS-Friendly Resumes',
   description: 'Build professional, ATS-optimized CVs with real-time feedback, job description matching, and beautiful LaTeX-generated PDFs.',
-  generator: 'v0.app',
+  generator: 'cv-builder',
   icons: {
     icon: [
       {
