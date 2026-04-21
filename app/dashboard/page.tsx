@@ -263,7 +263,7 @@ export default function DashboardPage() {
                   </span>
                   <span className="inline-flex items-center gap-1 rounded-full bg-background px-3 py-1 text-xs text-muted-foreground">
                     <FileSearch className="h-3 w-3 text-primary" />
-                    Job Description Tailoring
+                    Job Description Tailoring (Pro)
                   </span>
                   <span className="inline-flex items-center gap-1 rounded-full bg-background px-3 py-1 text-xs text-muted-foreground">
                     <Sparkles className="h-3 w-3 text-primary" />

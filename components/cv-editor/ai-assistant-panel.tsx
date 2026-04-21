@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
+import { useAuth } from '@/lib/auth-context'
 import {
   Sparkles,
   Loader2,
@@ -19,6 +20,7 @@ import {
   Wand2,
   Shield,
   Briefcase,
+  Lock,
   CheckCircle2,
   AlertTriangle,
   XCircle,
@@ -62,6 +64,7 @@ export function AIAssistantPanel({
   onApplyExperienceBullets,
   onApplyTailoredPackage,
 }: AIAssistantPanelProps) {
+  const { user } = useAuth()
   const { toast } = useToast()
   const [isReviewLoading, setIsReviewLoading] = useState(false)
   const [isTailorLoading, setIsTailorLoading] = useState(false)
@@ -72,6 +75,7 @@ export function AIAssistantPanel({
   const [jobTitle, setJobTitle] = useState('')
   const [company, setCompany] = useState('')
   const [jobDescription, setJobDescription] = useState('')
+  const isProUser = user?.tier === 'pro'
 
   const scoreTone = useMemo(() => {
     const score = reviewData?.review.atsReadinessScore ?? tailorData?.analysis.atsFitScore ?? 0
@@ -112,6 +116,16 @@ export function AIAssistantPanel({
   }
 
   const handleTailor = async () => {
+    if (!isProUser) {
+      const message = 'Job description tailoring is available on Pro plan only.'
+      setTailorError(message)
+      toast({
+        title: message,
+        variant: 'destructive',
+      })
+      return
+    }
+
     if (!jobDescription.trim()) return
 
     setIsTailorLoading(true)
@@ -131,10 +145,14 @@ export function AIAssistantPanel({
         }),
       })
 
-      const payload = (await response.json()) as TailorResponse & { error?: string }
+      const payload = (await response.json()) as TailorResponse & { error?: string; code?: string }
 
       if (!response.ok) {
-        throw new Error(payload.error || 'Failed to tailor CV')
+        const message =
+          response.status === 403 && payload.code === 'PRO_PLAN_REQUIRED'
+            ? 'Job description tailoring is available on Pro plan only.'
+            : payload.error || 'Failed to tailor CV'
+        throw new Error(message)
       }
 
       setTailorData(payload)
@@ -306,11 +324,24 @@ export function AIAssistantPanel({
             <div className="rounded-lg border bg-muted/30 p-3">
               <div className="mb-2 flex items-center gap-2 text-sm font-medium">
                 <Briefcase className="h-4 w-4" />
-                2. Tailor For A Job
+                2. Tailor For A Job (Pro)
               </div>
               <p className="mb-3 text-xs text-muted-foreground">
                 Paste a role description to get a targeted summary, missing keywords, interview angles, and bullet rewrites.
               </p>
+              {!isProUser && (
+                <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                  <div className="flex items-start gap-2">
+                    <Lock className="mt-0.5 h-4 w-4 shrink-0" />
+                    <div>
+                      <p className="font-medium">Pro feature</p>
+                      <p className="mt-1">
+                        Job description tailoring is locked on Free plan. Upgrade to Pro to unlock this action.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
               {tailorError && (
                 <div className="mb-3 rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-700">
                   <div className="flex items-start gap-2">
@@ -357,13 +388,13 @@ export function AIAssistantPanel({
                     className="min-h-40"
                   />
                 </div>
-                <Button onClick={handleTailor} disabled={isTailorLoading || !jobDescription.trim()} className="w-full">
+                <Button onClick={handleTailor} disabled={!isProUser || isTailorLoading || !jobDescription.trim()} className="w-full">
                   {isTailorLoading ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
                     <Sparkles className="mr-2 h-4 w-4" />
                   )}
-                  Tailor CV for This Role
+                  {isProUser ? 'Tailor CV for This Role' : 'Tailor CV for This Role (Pro)'}
                 </Button>
                 {isTailorLoading && (
                   <p className="text-xs text-muted-foreground">

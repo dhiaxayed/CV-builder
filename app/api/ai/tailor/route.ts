@@ -25,7 +25,10 @@ export async function POST(request: NextRequest) {
     const userTier = user.preferences?.tier || 'free'
     if (userTier !== 'pro') {
       return NextResponse.json(
-        { error: 'Job description tailoring is available on Pro plan only.' },
+        {
+          error: 'Job description tailoring is available on Pro plan only.',
+          code: 'PRO_PLAN_REQUIRED',
+        },
         { status: 403 }
       )
     }
