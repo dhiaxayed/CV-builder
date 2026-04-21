@@ -7,6 +7,7 @@ export interface User {
   email: string
   name: string | null
   photoUrl: string | null
+  tier: 'free' | 'pro'
 }
 
 interface AuthContextType {
@@ -27,7 +28,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const response = await fetch('/api/auth/session')
       if (response.ok) {
         const data = await response.json()
-        setUser(data.user)
+        if (data.user) {
+          setUser({
+            ...data.user,
+            tier: data.user.tier === 'pro' ? 'pro' : 'free',
+          })
+        } else {
+          setUser(null)
+        }
       } else {
         // API returned error (likely DB not configured)
         setUser(null)

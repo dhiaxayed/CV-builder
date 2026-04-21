@@ -16,6 +16,7 @@ import { FileText, ArrowLeft, ArrowRight, Sparkles, PenLine, CheckCircle2, Loade
 
 type Step = 'start' | 'template' | 'title'
 type StartOption = 'scratch' | 'sample'
+const FREE_TIER_CV_LIMIT = 1
 
 // Template definitions - 16 Professional Templates
 const TEMPLATES = [
@@ -50,15 +51,57 @@ export default function NewCVPage() {
   const [selectedTemplate, setSelectedTemplate] = useState<string>('modern')
   const [cvTitle, setCvTitle] = useState('')
   const [isCreating, setIsCreating] = useState(false)
+  const [existingCvCount, setExistingCvCount] = useState(0)
+  const [isCheckingLimit, setIsCheckingLimit] = useState(true)
   
   useEffect(() => {
     if (!isLoading && !user) {
       router.push('/auth/signin')
     }
   }, [isLoading, user, router])
+
+  useEffect(() => {
+    let isMounted = true
+
+    const fetchCvCount = async () => {
+      if (!user) {
+        if (isMounted) setIsCheckingLimit(false)
+        return
+      }
+
+      try {
+        const response = await fetch('/api/cvs')
+        if (!response.ok) return
+        const data = await response.json()
+        if (isMounted) {
+          setExistingCvCount(Array.isArray(data.cvs) ? data.cvs.length : 0)
+        }
+      } catch (error) {
+        console.error('Error loading CV count:', error)
+      } finally {
+        if (isMounted) setIsCheckingLimit(false)
+      }
+    }
+
+    fetchCvCount()
+
+    return () => {
+      isMounted = false
+    }
+  }, [user])
   
   const handleCreate = async () => {
     if (!user || !cvTitle) return
+
+    if (user.tier === 'free' && existingCvCount >= FREE_TIER_CV_LIMIT) {
+      toast({
+        title: 'Free plan limit reached',
+        description: 'Free plan allows 1 CV. Open your existing CV or upgrade to create more.',
+        variant: 'destructive',
+      })
+      router.push('/dashboard')
+      return
+    }
     
     setIsCreating(true)
     
@@ -74,24 +117,79 @@ export default function NewCVPage() {
           initialData: data,
         }),
       })
-      
+
+      const payload = await response.json().catch(() => null)
+
       if (!response.ok) {
-        throw new Error('Failed to create CV')
+        const apiError = typeof payload?.error === 'string' ? payload.error : 'Failed to create CV'
+        const isFreeTierLimitError = response.status === 403 && payload?.code === 'FREE_TIER_CV_LIMIT'
+
+        if (isFreeTierLimitError) {
+          toast({
+            title: 'Free plan limit reached',
+            description: apiError,
+            variant: 'destructive',
+          })
+          router.push('/dashboard')
+          return
+        }
+
+        throw new Error(apiError)
       }
-      
-      const { cv } = await response.json()
+
+      const cv = payload?.cv
+      if (!cv?.id) {
+        throw new Error('Invalid response while creating CV')
+      }
+
       toast({ title: 'CV created successfully!' })
       router.push(`/cv/${cv.id}/edit`)
     } catch (error) {
       console.error('Error creating CV:', error)
-      toast({ title: 'Failed to create CV', variant: 'destructive' })
+      toast({
+        title: error instanceof Error ? error.message : 'Failed to create CV',
+        variant: 'destructive',
+      })
     } finally {
       setIsCreating(false)
     }
   }
   
-  if (isLoading || !user) {
+  if (isLoading || !user || isCheckingLimit) {
     return null
+  }
+
+  if (user.tier === 'free' && existingCvCount >= FREE_TIER_CV_LIMIT) {
+    return (
+      <div className="min-h-screen bg-background">
+        <header className="border-b bg-card">
+          <div className="container mx-auto px-4 py-4 flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => router.push('/dashboard')}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div className="flex items-center gap-2">
+              <FileText className="h-6 w-6 text-primary" />
+              <span className="text-xl font-bold">Create New CV</span>
+            </div>
+          </div>
+        </header>
+        <main className="container mx-auto max-w-3xl px-4 py-12">
+          <Card className="border-amber-500/30 bg-amber-50/40">
+            <CardHeader>
+              <CardTitle>Free plan limit reached</CardTitle>
+              <CardDescription>
+                Your free plan allows 1 CV. Open your existing CV from the dashboard, delete it, or upgrade to Pro for unlimited CVs.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <Button variant="outline" onClick={() => router.push('/dashboard')}>
+                Back to Dashboard
+              </Button>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    )
   }
   
   return (

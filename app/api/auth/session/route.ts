@@ -22,6 +22,8 @@ export async function GET() {
     if (!user) {
       return NextResponse.json({ user: null })
     }
+
+    const userTier = user.preferences?.tier === 'pro' ? 'pro' : 'free'
     
     return NextResponse.json({ 
       user: {
@@ -29,6 +31,7 @@ export async function GET() {
         email: user.email,
         name: user.name,
         photoUrl: user.photo_url,
+        tier: userTier,
       }
     })
   } catch (error) {

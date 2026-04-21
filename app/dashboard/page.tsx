@@ -43,6 +43,8 @@ import {
 } from 'lucide-react'
 import type { CVData } from '@/lib/db'
 
+const FREE_TIER_CV_LIMIT = 1
+
 type CVWithVersion = {
   id: string
   user_id: string
@@ -129,16 +131,21 @@ export default function DashboardPage() {
     
     try {
       const response = await fetch(`/api/cvs/${selectedCV.id}/duplicate`, { method: 'POST' })
+      const payload = await response.json().catch(() => null)
+
       if (response.ok) {
-        const data = await response.json()
         // Refresh the list
         fetchCVs()
         toast({ title: 'CV duplicated successfully' })
       } else {
-        throw new Error('Failed to duplicate')
+        const apiError = typeof payload?.error === 'string' ? payload.error : 'Failed to duplicate CV'
+        throw new Error(apiError)
       }
-    } catch {
-      toast({ title: 'Failed to duplicate CV', variant: 'destructive' })
+    } catch (error) {
+      toast({
+        title: error instanceof Error ? error.message : 'Failed to duplicate CV',
+        variant: 'destructive',
+      })
     } finally {
       setIsDuplicating(false)
       setDuplicateDialogOpen(false)
@@ -176,6 +183,8 @@ export default function DashboardPage() {
   }
   
   if (!user) return null
+
+  const isFreeTierLimitReached = user.tier === 'free' && cvs.length >= FREE_TIER_CV_LIMIT
   
   return (
     <div className="min-h-screen bg-background">
@@ -207,9 +216,14 @@ export default function DashboardPage() {
             <p className="text-muted-foreground mt-1">
               Create and manage your professional CVs
             </p>
+            {isFreeTierLimitReached && (
+              <p className="mt-2 text-sm text-amber-700">
+                Free plan allows 1 CV. Delete your current CV or upgrade to Pro to create another one.
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-3">
-            <Button onClick={() => router.push('/cv/new')}>
+            <Button onClick={() => router.push('/cv/new')} disabled={isFreeTierLimitReached}>
               <Plus className="h-4 w-4 mr-2" />
               Create New CV
             </Button>
@@ -310,6 +324,7 @@ export default function DashboardPage() {
                             Edit
                           </DropdownMenuItem>
                           <DropdownMenuItem 
+                            disabled={isFreeTierLimitReached}
                             onClick={() => {
                               setSelectedCV(cv)
                               setDuplicateTitle(`${cv.title} (Copy)`)

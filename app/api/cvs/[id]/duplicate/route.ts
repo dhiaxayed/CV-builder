@@ -23,11 +23,16 @@ export async function POST(
     
     // Check user tier and enforce free tier limit (max 1 CV)
     const userTier = user.preferences?.tier || 'free'
+    const freeTierCvLimit = 1
     if (userTier === 'free') {
       const existingCVs = await getUserCVs(user.id)
-      if (existingCVs && existingCVs.length >= 1) {
+      if (existingCVs && existingCVs.length >= freeTierCvLimit) {
         return NextResponse.json(
-          { error: 'Free tier limit reached. Please upgrade to Pro to create unlimited CVs.' },
+          {
+            error: 'Free tier limit reached. Please upgrade to Pro to create unlimited CVs.',
+            code: 'FREE_TIER_CV_LIMIT',
+            limit: freeTierCvLimit,
+          },
           { status: 403 }
         )
       }
