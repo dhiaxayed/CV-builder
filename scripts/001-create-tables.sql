@@ -15,12 +15,41 @@ CREATE TABLE IF NOT EXISTS users (
   email VARCHAR(255) UNIQUE NOT NULL,
   name VARCHAR(255),
   photo_url TEXT,
+  plan_tier VARCHAR(20) NOT NULL DEFAULT 'free',
   preferences JSONB DEFAULT '{}',
   email_verified BOOLEAN DEFAULT FALSE,
   last_login_at TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Backward-compatible billing migration:
+-- 1) Ensure explicit plan_tier column exists
+-- 2) Backfill from users.preferences->>'tier' when present
+-- 3) Enforce valid values only
+ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_tier VARCHAR(20) DEFAULT 'free';
+
+UPDATE users
+SET plan_tier = CASE
+  WHEN COALESCE(preferences->>'tier', 'free') = 'pro' THEN 'pro'
+  ELSE 'free'
+END
+WHERE plan_tier IS NULL OR plan_tier NOT IN ('free', 'pro');
+
+ALTER TABLE users ALTER COLUMN plan_tier SET DEFAULT 'free';
+ALTER TABLE users ALTER COLUMN plan_tier SET NOT NULL;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'users_plan_tier_check'
+  ) THEN
+    ALTER TABLE users
+    ADD CONSTRAINT users_plan_tier_check CHECK (plan_tier IN ('free', 'pro'));
+  END IF;
+END $$;
 
 -- Magic link tokens for passwordless auth
 CREATE TABLE IF NOT EXISTS auth_tokens (
@@ -184,6 +213,7 @@ CREATE TABLE IF NOT EXISTS uploaded_files (
 -- ============================================
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_plan_tier ON users(plan_tier);
 CREATE INDEX IF NOT EXISTS idx_cvs_user_id ON cvs(user_id);
 CREATE INDEX IF NOT EXISTS idx_cvs_share_token ON cvs(share_token);
 CREATE INDEX IF NOT EXISTS idx_cvs_updated_at ON cvs(updated_at DESC);

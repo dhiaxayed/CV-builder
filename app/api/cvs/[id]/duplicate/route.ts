@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { getSessionUser } from '@/lib/db/users'
 import { getCV, duplicateCV, getUserCVs } from '@/lib/db/cvs'
+import { resolveUserTier } from '@/lib/billing/tier'
 
 export async function POST(
   request: NextRequest,
@@ -22,7 +23,7 @@ export async function POST(
     }
     
     // Check user tier and enforce free tier limit (max 1 CV)
-    const userTier = user.preferences?.tier || 'free'
+    const userTier = resolveUserTier(user)
     const freeTierCvLimit = 1
     if (userTier === 'free') {
       const existingCVs = await getUserCVs(user.id)

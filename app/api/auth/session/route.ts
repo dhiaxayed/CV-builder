@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSessionUser, deleteSession } from '@/lib/db/users'
 import { isDatabaseConfigured } from '@/lib/db'
+import { resolveUserTier } from '@/lib/billing/tier'
 import { cookies } from 'next/headers'
 
 export async function GET() {
@@ -23,7 +24,7 @@ export async function GET() {
       return NextResponse.json({ user: null })
     }
 
-    const userTier = user.preferences?.tier === 'pro' ? 'pro' : 'free'
+    const userTier = resolveUserTier(user)
     
     return NextResponse.json({ 
       user: {

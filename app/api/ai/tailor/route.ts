@@ -4,6 +4,7 @@ import { getSessionUser } from '@/lib/db/users'
 import { getCV, saveJobDescription } from '@/lib/db/cvs'
 import { CVData } from '@/lib/types/cv'
 import { generateJobTailorAnalysis } from '@/lib/ai/cv-review'
+import { resolveUserTier } from '@/lib/billing/tier'
 
 export const maxDuration = 60
 
@@ -22,7 +23,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const userTier = user.preferences?.tier || 'free'
+    const userTier = resolveUserTier(user)
     if (userTier !== 'pro') {
       return NextResponse.json(
         {

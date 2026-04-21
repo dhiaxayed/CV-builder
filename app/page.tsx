@@ -359,7 +359,7 @@ export default function HomePage() {
               Pricing
             </Badge>
             <h2 className="mb-4 text-4xl font-bold">Start Free, Upgrade When Ready</h2>
-            <p className="text-xl text-muted-foreground">No hidden fees. No credit card required.</p>
+            <p className="text-xl text-muted-foreground">Clear plan limits aligned with the real product behavior.</p>
           </div>
 
           <div className="mx-auto grid max-w-3xl gap-8 md:grid-cols-2">
@@ -371,7 +371,14 @@ export default function HomePage() {
                   $0<span className="text-lg font-normal text-muted-foreground">/month</span>
                 </div>
                 <ul className="mb-6 space-y-3">
-                  {['1 CV', 'All templates', 'PDF export', 'ATS scoring', 'Version history'].map((feature) => (
+                  {[
+                    '1 CV total (enforced)',
+                    'All 16 templates',
+                    'AI ATS review',
+                    'PDF export',
+                    'Version history',
+                    'Shareable CV link',
+                  ].map((feature) => (
                     <li key={feature} className="flex items-center gap-2">
                       <span className="h-2 w-2 rounded-full bg-green-600" />
                       <span>{feature}</span>
@@ -396,13 +403,12 @@ export default function HomePage() {
                 </div>
                 <ul className="mb-6 space-y-3">
                   {[
+                    'Everything in Free',
                     'Unlimited CVs',
-                    'All templates',
-                    'PDF export',
-                    'ATS scoring',
-                    'Job description matching',
-                    'Priority support',
-                    'Remove branding',
+                    'AI job description tailoring',
+                    'Keyword gap analysis',
+                    'Tailored summary and bullet rewrite package',
+                    'Saved job-targeting history',
                   ].map((feature) => (
                     <li key={feature} className="flex items-center gap-2">
                       <span className="h-2 w-2 rounded-full bg-green-600" />
@@ -414,11 +420,15 @@ export default function HomePage() {
                   className="w-full bg-linear-to-r from-primary to-purple-600"
                   onClick={() => router.push('/auth/signin')}
                 >
-                  Start 7-Day Free Trial
+                  Upgrade to Pro
                 </Button>
               </CardContent>
             </Card>
           </div>
+
+          <p className="mt-6 text-center text-sm text-muted-foreground">
+            Backend-enforced limits: Free = 1 CV max, AI Job Tailoring = Pro only.
+          </p>
         </div>
       </section>
 

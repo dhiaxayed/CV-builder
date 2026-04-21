@@ -41,6 +41,7 @@ export type DbUser = {
   email: string
   name: string | null
   photo_url: string | null
+  plan_tier: 'free' | 'pro' | null
   preferences: Record<string, unknown>
   email_verified: boolean
   last_login_at: Date | null

@@ -3,16 +3,16 @@ import * as fs from 'fs'
 import * as path from 'path'
 import * as dotenv from 'dotenv'
 
-// Load environment variables from .env.local
 dotenv.config({ path: '.env.local' })
 
 async function runMigration() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY
-  
+  const supabaseKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY
+
   if (!supabaseUrl || !supabaseKey) {
-    console.error('❌ Supabase environment variables are not set')
-    console.log('\n📝 To set up your database:')
+    console.error('[Error] Supabase environment variables are not set')
+    console.log('\nTo set up your database:')
     console.log('1. Go to your Supabase project dashboard')
     console.log('2. Copy your project URL and anon key')
     console.log('3. Create a .env.local file with:')
@@ -20,41 +20,51 @@ async function runMigration() {
     console.log('   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=your_anon_key')
     process.exit(1)
   }
-  
-  console.log('🚀 Starting database migration...')
-  console.log(`📡 Connected to: ${supabaseUrl}`)
-  
+
+  console.log('[Info] Starting database migration check...')
+  console.log(`[Info] Connected to: ${supabaseUrl}`)
+
   try {
     const supabase = createClient(supabaseUrl, supabaseKey)
-    
-    // Read the migration file
-    const migrationPath = path.join(__dirname, '001-create-tables.sql')
-    const migrationSQL = fs.readFileSync(migrationPath, 'utf-8')
-    
-    console.log('\n📝 Migration SQL loaded.')
-    console.log('\n⚠️  IMPORTANT: For Supabase, you need to run the migration manually:')
-    console.log('\n1. Go to your Supabase Dashboard: https://supabase.com/dashboard')
-    console.log('2. Select your project')
-    console.log('3. Go to SQL Editor')
-    console.log('4. Copy and paste the contents of: scripts/001-create-tables.sql')
-    console.log('5. Click "Run" to execute the migration')
-    console.log('\n✅ Migration file location: scripts/001-create-tables.sql')
-    
-    // Try to check if tables exist
-    const { data, error } = await supabase.from('users').select('id').limit(1)
-    
-    if (error && error.message.includes('does not exist')) {
-      console.log('\n❌ Tables do not exist yet. Please run the migration SQL in Supabase dashboard.')
-    } else if (error) {
-      console.log('\n⚠️ Connection test error:', error.message)
-    } else {
-      console.log('\n✅ Tables already exist! Database is ready.')
+
+    const bootstrapPath = path.join(__dirname, '001-create-tables.sql')
+    const tierPatchPath = path.join(__dirname, '002-add-plan-tier.sql')
+
+    const hasBootstrap = fs.existsSync(bootstrapPath)
+    const hasTierPatch = fs.existsSync(tierPatchPath)
+
+    if (!hasBootstrap) {
+      console.error('[Error] Missing scripts/001-create-tables.sql')
+      process.exit(1)
     }
-    
+
+    console.log('\n[Info] SQL migration files detected:')
+    console.log(' - scripts/001-create-tables.sql')
+    if (hasTierPatch) {
+      console.log(' - scripts/002-add-plan-tier.sql')
+    }
+
+    console.log('\nIMPORTANT: For Supabase, run migrations manually in SQL Editor:')
+    console.log('1. Open https://supabase.com/dashboard')
+    console.log('2. Select your project')
+    console.log('3. Open SQL Editor')
+    console.log('4. Run scripts/001-create-tables.sql if database is new')
+    console.log('5. Run scripts/002-add-plan-tier.sql to add billing tier column')
+
+    const { error } = await supabase.from('users').select('id').limit(1)
+
+    if (error && error.message.includes('does not exist')) {
+      console.log('\n[Warn] Table users does not exist yet. Run 001-create-tables.sql first.')
+    } else if (error) {
+      console.log('\n[Warn] Connection test error:', error.message)
+    } else {
+      console.log('\n[OK] Users table exists. You can run 002-add-plan-tier.sql safely.')
+    }
   } catch (error) {
-    console.error('❌ Migration failed:', error)
+    console.error('[Error] Migration check failed:', error)
     process.exit(1)
   }
 }
 
 runMigration()
+
