@@ -124,6 +124,140 @@
   }
 }
 
+@layer utilities {
+  .landing-grid {
+    background-image:
+      linear-gradient(rgba(15, 23, 42, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(15, 23, 42, 0.045) 1px, transparent 1px),
+      linear-gradient(135deg, rgba(13, 148, 136, 0.08), rgba(37, 99, 235, 0.06), transparent 55%);
+    background-size: 48px 48px, 48px 48px, 100% 100%;
+    animation: landing-grid-shift 18s linear infinite;
+  }
+
+  .professional-sheen {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .professional-sheen::before {
+    position: absolute;
+    inset: 0;
+    content: '';
+    pointer-events: none;
+    background: linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, 0.14) 42%, transparent 58%);
+    transform: translateX(-120%);
+    animation: professional-sheen 7s ease-in-out infinite;
+  }
+
+  .motion-fade-up {
+    animation: motion-fade-up 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .motion-fade-up-delay {
+    animation: motion-fade-up 850ms cubic-bezier(0.22, 1, 0.36, 1) 120ms both;
+  }
+
+  .workflow-rail {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .workflow-rail::after {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -35%;
+    width: 30%;
+    content: '';
+    pointer-events: none;
+    background: linear-gradient(90deg, transparent, rgba(13, 148, 136, 0.14), transparent);
+    animation: workflow-scan 5.5s ease-in-out infinite;
+  }
+
+  .landing-progress {
+    width: 100%;
+    transform-origin: left;
+    animation: landing-progress 1.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .design-pulse {
+    animation: design-pulse 3.8s ease-in-out infinite;
+  }
+}
+
+@keyframes landing-grid-shift {
+  from {
+    background-position: 0 0, 0 0, center;
+  }
+  to {
+    background-position: 48px 48px, 48px 48px, center;
+  }
+}
+
+@keyframes professional-sheen {
+  0%,
+  46% {
+    transform: translateX(-120%);
+  }
+  78%,
+  100% {
+    transform: translateX(120%);
+  }
+}
+
+@keyframes motion-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes workflow-scan {
+  0%,
+  35% {
+    transform: translateX(0);
+  }
+  75%,
+  100% {
+    transform: translateX(450%);
+  }
+}
+
+@keyframes landing-progress {
+  from {
+    transform: scaleX(0.18);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes design-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(13, 148, 136, 0);
+  }
+  45% {
+    box-shadow: 0 0 0 8px rgba(13, 148, 136, 0.12);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-grid,
+  .professional-sheen::before,
+  .motion-fade-up,
+  .motion-fade-up-delay,
+  .workflow-rail::after,
+  .landing-progress,
+  .design-pulse {
+    animation: none;
+  }
+}
+
 /* CV Preview Styles */
 .cv-preview {
   font-family: 'Times New Roman', Times, serif;

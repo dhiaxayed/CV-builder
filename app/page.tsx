@@ -52,6 +52,12 @@ const TEMPLATE_GROUPS = [
   ],
 ]
 
+const HERO_SIGNALS = [
+  { label: 'ATS signal', value: '92%', tone: 'bg-teal-500' },
+  { label: 'Layout polish', value: '16 templates', tone: 'bg-blue-500' },
+  { label: 'Export flow', value: 'PDF + LaTeX', tone: 'bg-amber-500' },
+]
+
 function FeatureCard({
   icon: Icon,
   title,
@@ -64,16 +70,16 @@ function FeatureCard({
   badge?: string
 }) {
   return (
-    <Card className="group border-2 transition-all duration-300 hover:-translate-y-1 hover:border-primary/20 hover:shadow-xl">
+    <Card className="group border border-slate-200/80 bg-card/95 transition-all duration-300 hover:-translate-y-1 hover:border-teal-500/30 hover:shadow-[0_18px_45px_rgba(15,23,42,0.10)]">
       <CardContent className="pt-6">
         <div className="relative">
           {badge && (
-            <Badge className="absolute -top-2 -right-2 bg-linear-to-r from-orange-500 to-pink-500">
+            <Badge className="absolute -top-2 -right-2 bg-slate-950 text-white">
               {badge}
             </Badge>
           )}
-          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-linear-to-br from-primary/10 to-primary/5 transition-transform group-hover:scale-110">
-            <Icon className="h-7 w-7 text-primary" />
+          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-linear-to-br from-slate-900/10 to-teal-600/10 transition-transform group-hover:scale-110">
+            <Icon className="h-7 w-7 text-teal-700" />
           </div>
         </div>
         <h3 className="mb-2 text-xl font-semibold">{title}</h3>
@@ -100,7 +106,7 @@ export default function HomePage() {
           <div className="rounded-xl bg-primary p-3">
             <FileText className="h-8 w-8 text-primary-foreground" />
           </div>
-          <span className="bg-linear-to-r from-primary to-purple-600 bg-clip-text text-2xl font-bold text-transparent">
+          <span className="bg-linear-to-r from-slate-950 to-teal-700 bg-clip-text text-2xl font-bold text-transparent">
             CV Builder
           </span>
         </div>
@@ -110,7 +116,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="bg-linear-to-r from-primary via-purple-600 to-pink-600 px-4 py-2 text-center text-sm text-white">
+      <div className="professional-sheen bg-slate-950 px-4 py-2 text-center text-sm text-white">
         <span className="inline-flex items-center gap-2">
           <Sparkles className="h-4 w-4" />
           <strong>NEW:</strong> AI-powered ATS scoring now available! Get instant feedback on your CV.
@@ -146,7 +152,7 @@ export default function HomePage() {
             </Button>
             <Button
               onClick={() => router.push('/auth/signin')}
-              className="bg-linear-to-r from-primary to-purple-600 hover:opacity-90"
+              className="bg-slate-950 text-white hover:bg-slate-800"
             >
               Get Started Free
             </Button>
@@ -154,22 +160,19 @@ export default function HomePage() {
         </div>
       </header>
 
-      <section className="relative overflow-hidden px-4 py-20">
-        <div className="absolute inset-0 -z-10">
-          <div className="absolute top-1/4 left-1/4 h-72 w-72 rounded-full bg-primary/30 blur-[100px]" />
-          <div className="absolute right-1/4 bottom-1/4 h-96 w-96 rounded-full bg-purple-500/20 blur-[120px]" />
-        </div>
+      <section className="relative overflow-hidden border-b bg-slate-50 px-4 py-20">
+        <div className="landing-grid pointer-events-none absolute inset-0" />
 
         <div className="container mx-auto max-w-6xl">
-          <div className="mb-8 text-center">
-            <Badge variant="outline" className="mb-4 px-4 py-1">
+          <div className="motion-fade-up relative mb-8 text-center">
+            <Badge variant="outline" className="mb-4 border-teal-700/30 bg-white/80 px-4 py-1 text-teal-800">
               <Palette className="mr-1 h-3 w-3" />
               Real template previews
             </Badge>
-            <h1 className="mb-6 bg-linear-to-r from-slate-900 via-slate-700 to-slate-900 bg-clip-text text-5xl font-bold tracking-tight text-transparent dark:from-white dark:via-slate-200 dark:to-white md:text-7xl">
+            <h1 className="mb-6 bg-linear-to-r from-slate-950 via-slate-800 to-slate-950 bg-clip-text text-5xl font-bold tracking-tight text-transparent dark:from-white dark:via-slate-200 dark:to-white md:text-7xl">
               Create ATS-Friendly CVs
               <br />
-              <span className="bg-linear-to-r from-primary via-purple-600 to-pink-600 bg-clip-text text-transparent">
+              <span className="bg-linear-to-r from-blue-800 via-teal-700 to-slate-900 bg-clip-text text-transparent">
                 With Templates You Can Actually Preview
               </span>
             </h1>
@@ -181,7 +184,7 @@ export default function HomePage() {
               <Button
                 size="lg"
                 onClick={() => router.push('/auth/signin')}
-                className="h-14 bg-linear-to-r from-primary to-purple-600 px-8 text-lg hover:opacity-90"
+                className="h-14 bg-slate-950 px-8 text-lg text-white shadow-[0_18px_40px_rgba(15,23,42,0.18)] transition-transform hover:-translate-y-0.5 hover:bg-slate-800"
               >
                 Start Building for Free
                 <ArrowRight className="ml-2 h-5 w-5" />
@@ -191,12 +194,28 @@ export default function HomePage() {
               No credit card required | Free forever plan | Export to PDF
             </p>
           </div>
+
+          <div className="motion-fade-up-delay mx-auto mt-12 max-w-5xl">
+            <div className="workflow-rail grid gap-4 rounded-lg border border-slate-200 bg-white/85 p-4 shadow-[0_24px_70px_rgba(15,23,42,0.10)] backdrop-blur md:grid-cols-3">
+              {HERO_SIGNALS.map((signal) => (
+                <div key={signal.label} className="relative overflow-hidden rounded-md border border-slate-200 bg-white p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <span className="text-sm font-medium text-slate-700">{signal.label}</span>
+                    <span className="text-sm font-semibold text-slate-950">{signal.value}</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                    <div className={`landing-progress h-full rounded-full ${signal.tone}`} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
       <section id="features" className="px-4 py-24">
         <div className="container mx-auto max-w-6xl">
-          <div className="mb-16 text-center">
+          <div className="motion-fade-up mb-16 text-center">
             <Badge variant="outline" className="mb-4">
               Features
             </Badge>
@@ -207,7 +226,7 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="motion-fade-up-delay grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             <FeatureCard
               icon={Shield}
               title="ATS-Optimized Templates"
@@ -260,16 +279,16 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="bg-muted/30 px-4 py-24">
+      <section className="bg-slate-50 px-4 py-24">
         <div className="container mx-auto max-w-6xl">
-          <div className="mb-16 text-center">
+          <div className="motion-fade-up mb-16 text-center">
             <Badge variant="outline" className="mb-4">
               How It Works
             </Badge>
             <h2 className="mb-4 text-4xl font-bold">Build Your CV in 3 Simple Steps</h2>
           </div>
 
-          <div className="grid gap-8 md:grid-cols-3">
+          <div className="motion-fade-up-delay grid gap-8 md:grid-cols-3">
             {[
               {
                 step: '1',
@@ -292,7 +311,7 @@ export default function HomePage() {
             ].map(({ step, title, desc }) => (
               <div key={step} className="relative">
                 <div className="text-center">
-                  <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-2xl font-bold text-primary-foreground">
+                  <div className="design-pulse mb-4 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-950 text-2xl font-bold text-white">
                     {step}
                   </div>
                   <h3 className="mb-2 text-xl font-semibold">{title}</h3>
@@ -309,7 +328,7 @@ export default function HomePage() {
 
       <section id="templates" className="px-4 py-24">
         <div className="container mx-auto max-w-7xl">
-          <div className="mb-16 text-center">
+          <div className="motion-fade-up mb-16 text-center">
             <Badge variant="outline" className="mb-4">
               16 Professional Templates
             </Badge>
@@ -320,7 +339,7 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="space-y-8">
+          <div className="motion-fade-up-delay space-y-8">
             {TEMPLATE_GROUPS.map((group, index) => (
               <div key={index} className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-4">
                 {group.map((template) => (
@@ -349,7 +368,7 @@ export default function HomePage() {
 
       <section id="pricing" className="px-4 py-24">
         <div className="container mx-auto max-w-4xl">
-          <div className="mb-16 text-center">
+          <div className="motion-fade-up mb-16 text-center">
             <Badge variant="outline" className="mb-4">
               Pricing
             </Badge>
@@ -357,8 +376,8 @@ export default function HomePage() {
             <p className="text-xl text-muted-foreground">Clear plan limits aligned with the real product behavior.</p>
           </div>
 
-          <div className="mx-auto grid max-w-3xl gap-8 md:grid-cols-2">
-            <Card className="border-2">
+          <div className="motion-fade-up-delay mx-auto grid max-w-3xl gap-8 md:grid-cols-2">
+            <Card className="border-2 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_18px_45px_rgba(15,23,42,0.10)]">
               <CardContent className="pt-6">
                 <h3 className="mb-2 text-2xl font-bold">Free</h3>
                 <p className="mb-4 text-muted-foreground">Perfect for getting started</p>
@@ -386,8 +405,8 @@ export default function HomePage() {
               </CardContent>
             </Card>
 
-            <Card className="relative overflow-hidden border-2 border-primary">
-              <div className="absolute top-0 right-0 rounded-bl-lg bg-primary px-3 py-1 text-xs text-primary-foreground">
+            <Card className="relative overflow-hidden border-2 border-teal-700 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_18px_45px_rgba(15,23,42,0.14)]">
+              <div className="absolute top-0 right-0 rounded-bl-lg bg-teal-700 px-3 py-1 text-xs text-white">
                 Popular
               </div>
               <CardContent className="pt-6">
@@ -412,7 +431,7 @@ export default function HomePage() {
                   ))}
                 </ul>
                 <Button
-                  className="w-full bg-linear-to-r from-primary to-purple-600"
+                  className="w-full bg-slate-950 text-white hover:bg-slate-800"
                   onClick={() => router.push('/auth/signin')}
                 >
                   Sign in for Pro access
@@ -427,8 +446,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="bg-linear-to-r from-primary via-purple-600 to-pink-600 px-4 py-24 text-white">
-        <div className="container mx-auto max-w-3xl text-center">
+      <section className="professional-sheen bg-slate-950 px-4 py-24 text-white">
+        <div className="motion-fade-up container mx-auto max-w-3xl text-center">
           <h2 className="mb-4 text-4xl font-bold md:text-5xl">Ready to Build a Stronger CV?</h2>
           <p className="mb-8 text-xl text-white/80">
             Start with a real template preview, tailor your content, and export a polished PDF.

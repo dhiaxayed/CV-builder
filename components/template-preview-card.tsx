@@ -85,7 +85,7 @@ export function TemplatePreviewCard({
       </div>
 
       {popular && (
-        <Badge className="absolute -top-2 -right-2 bg-gradient-to-r from-orange-500 to-pink-500">
+        <Badge className="absolute -top-2 -right-2 bg-slate-950 text-white">
           Popular
         </Badge>
       )}
