@@ -42,7 +42,7 @@ export default function ExportPage() {
       
       try {
         setIsLoading(true)
-        const response = await fetch(`/api/cvs/${params.id}`)
+        const response = await fetch(`/api/cvs/${params.id}`, { cache: 'no-store' })
         if (!response.ok) {
           if (response.status === 404 || response.status === 403) {
             router.push('/dashboard')
@@ -77,6 +77,7 @@ export default function ExportPage() {
       const response = await fetch('/api/pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
         body: JSON.stringify({
           cvData: cv.data,
           cvId: cv.id,

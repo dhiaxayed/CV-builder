@@ -151,7 +151,7 @@ export default function CVEditorPage() {
   const loadCV = async () => {
     try {
       setIsLoading(true)
-      const response = await fetch(`/api/cvs/${params.id}`)
+      const response = await fetch(`/api/cvs/${params.id}`, { cache: 'no-store' })
       
       if (!response.ok) {
         if (response.status === 404 || response.status === 403) {
@@ -210,6 +210,7 @@ export default function CVEditorPage() {
       const response = await fetch(`/api/cvs/${cv.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
         body: JSON.stringify({ data: cvData }),
       })
       
@@ -218,8 +219,10 @@ export default function CVEditorPage() {
       setHasUnsavedChanges(false)
       setLastSavedAt(new Date().toISOString())
       toast({ title: 'Changes saved' })
+      return true
     } catch {
       toast({ title: 'Failed to save changes', variant: 'destructive' })
+      return false
     } finally {
       setIsSaving(false)
     }
@@ -447,11 +450,19 @@ export default function CVEditorPage() {
         throw new Error('CV data is not loaded yet')
       }
 
+      if (hasUnsavedChanges) {
+        const saved = await saveChanges()
+        if (!saved) {
+          throw new Error('Save your latest changes before exporting the PDF')
+        }
+      }
+
       toast({ title: 'Generating PDF...' })
       
       const response = await fetch('/api/pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
         body: JSON.stringify({ 
           cvData, 
           cvId: cv?.id,

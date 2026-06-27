@@ -49,7 +49,14 @@ export async function GET(
       data: cvData,
     }
     
-    return NextResponse.json({ cv: cvWithData })
+    return NextResponse.json(
+      { cv: cvWithData },
+      {
+        headers: {
+          'Cache-Control': 'no-store',
+        },
+      }
+    )
   } catch (error) {
     console.error('Error getting CV:', error)
     return NextResponse.json({ error: 'Failed to get CV' }, { status: 500 })
@@ -91,7 +98,14 @@ export async function PUT(
     
     if (data) {
       const version = await updateCVData(id, data)
-      return NextResponse.json({ version })
+      return NextResponse.json(
+        { version },
+        {
+          headers: {
+            'Cache-Control': 'no-store',
+          },
+        }
+      )
     }
     
     return NextResponse.json({ success: true })

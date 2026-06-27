@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { getSessionUser } from '@/lib/db/users'
-import { getCV, recordCVExport } from '@/lib/db/cvs'
+import { getCVWithCurrentVersion, recordCVExport } from '@/lib/db/cvs'
 import { CVData } from '@/lib/types/cv'
 import { generateLatex } from '@/lib/latex/generator'
 import { promises as fs } from 'fs'
@@ -419,45 +419,59 @@ export async function POST(request: Request) {
 
     const { cvData, cvId, format, templateId, title } = await request.json()
 
-    if (!cvData) {
+    if (!cvData && !cvId) {
       return NextResponse.json({ error: 'No CV data provided' }, { status: 400 })
     }
 
+    let effectiveCVData = cvData as CVData | undefined
+    let effectiveTemplateId = typeof templateId === 'string' && templateId.trim().length > 0 ? templateId.trim() : 'modern'
+    let effectiveTitle = typeof title === 'string' && title.trim().length > 0 ? title.trim() : undefined
+
     if (cvId) {
-      const cv = await getCV(String(cvId))
+      const cv = await getCVWithCurrentVersion(String(cvId))
       if (!cv || cv.user_id !== user.id) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
       }
+
+      if (cv.current_version?.data) {
+        effectiveCVData = cv.current_version.data as CVData
+      }
+
+      effectiveTemplateId = cv.template_id || effectiveTemplateId
+      effectiveTitle = cv.title || effectiveTitle
     }
 
-    const requestedTemplateId =
-      typeof templateId === 'string' && templateId.trim().length > 0 ? templateId.trim() : 'modern'
+    if (!effectiveCVData) {
+      return NextResponse.json({ error: 'No CV data available for export' }, { status: 400 })
+    }
 
-    const safeName = sanitizeFileName(title || cvData.basics?.name || 'cv')
+    const safeName = sanitizeFileName(effectiveTitle || effectiveCVData.basics?.name || 'cv')
 
     if (format === 'latex') {
-      const latex = generateLatex(cvData as CVData, requestedTemplateId)
+      const latex = generateLatex(effectiveCVData, effectiveTemplateId)
       if (cvId) await recordCVExport(String(cvId))
       return new NextResponse(latex, {
         headers: {
           'Content-Type': 'text/plain',
           'Content-Disposition': `attachment; filename="${safeName}.tex"`,
+          'Cache-Control': 'no-store',
         },
       })
     }
 
     if (format === 'json') {
       if (cvId) await recordCVExport(String(cvId))
-      return new NextResponse(JSON.stringify(cvData, null, 2), {
+      return new NextResponse(JSON.stringify(effectiveCVData, null, 2), {
         headers: {
           'Content-Type': 'application/json',
           'Content-Disposition': `attachment; filename="${safeName}.json"`,
+          'Cache-Control': 'no-store',
         },
       })
     }
 
-    const normalizedCV = cvData as CVData
-    const latex = generateLatex(normalizedCV, requestedTemplateId)
+    const normalizedCV = effectiveCVData
+    const latex = generateLatex(normalizedCV, effectiveTemplateId)
 
     let renderMode: 'latex' | 'fallback' = 'latex'
     let pdfBytes: Uint8Array
@@ -471,7 +485,7 @@ export async function POST(request: Request) {
       }
       // Vercel/serverless-safe fallback when LaTeX binaries are unavailable.
       renderMode = 'fallback'
-      pdfBytes = await generateSimplePdf(normalizedCV, requestedTemplateId)
+      pdfBytes = await generateSimplePdf(normalizedCV, effectiveTemplateId)
     }
 
     if (cvId) await recordCVExport(String(cvId))
@@ -481,7 +495,8 @@ export async function POST(request: Request) {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="${safeName}.pdf"`,
         'X-CV-PDF-Renderer': renderMode,
-        'X-CV-PDF-Template': requestedTemplateId,
+        'X-CV-PDF-Template': effectiveTemplateId,
+        'Cache-Control': 'no-store',
       },
     })
   } catch (error) {
