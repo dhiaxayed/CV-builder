@@ -7,7 +7,7 @@ import { promises as fs } from 'fs'
 import { tmpdir } from 'os'
 import path from 'path'
 import { spawn } from 'child_process'
-import { PDFDocument, StandardFonts } from 'pdf-lib'
+import { PDFDocument, StandardFonts, rgb, type RGB } from 'pdf-lib'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -28,17 +28,85 @@ function formatDateRange(start?: string, end?: string, current?: boolean): strin
   return [from, to].filter(Boolean).join(' - ')
 }
 
-async function generateSimplePdf(cvData: CVData): Promise<Uint8Array> {
+type SimplePdfStyle = {
+  label: string
+  banner: [number, number, number]
+  accent: [number, number, number]
+  sidebar?: [number, number, number]
+}
+
+const FALLBACK_TEMPLATE_STYLES: Record<string, SimplePdfStyle> = {
+  modern: { label: 'Modern', banner: [33, 99, 235], accent: [37, 99, 235] },
+  classic: { label: 'Classic', banner: [55, 65, 81], accent: [31, 41, 55] },
+  minimal: { label: 'Minimal', banner: [107, 114, 128], accent: [75, 85, 99] },
+  compact: { label: 'Compact', banner: [30, 64, 175], accent: [30, 58, 138] },
+  professional: { label: 'Professional', banner: [30, 58, 138], accent: [30, 64, 175] },
+  executive: { label: 'Executive', banner: [15, 23, 42], accent: [30, 41, 59] },
+  banking: { label: 'Banking', banner: [17, 24, 39], accent: [17, 24, 39], sidebar: [226, 232, 240] },
+  elegant: { label: 'Elegant', banner: [59, 130, 246], accent: [37, 99, 235], sidebar: [239, 246, 255] },
+  creative: { label: 'Creative', banner: [236, 72, 153], accent: [190, 24, 93], sidebar: [253, 242, 248] },
+  fancy: { label: 'Fancy', banner: [217, 70, 239], accent: [168, 85, 247], sidebar: [250, 245, 255] },
+  bold: { label: 'Bold', banner: [220, 38, 38], accent: [185, 28, 28], sidebar: [254, 242, 242] },
+  infographic: { label: 'Infographic', banner: [249, 115, 22], accent: [234, 88, 12], sidebar: [255, 247, 237] },
+  tech: { label: 'Tech', banner: [6, 95, 70], accent: [4, 120, 87], sidebar: [236, 253, 245] },
+  academic: { label: 'Academic', banner: [67, 56, 202], accent: [79, 70, 229], sidebar: [238, 242, 255] },
+  casual: { label: 'Casual', banner: [14, 165, 233], accent: [2, 132, 199], sidebar: [240, 249, 255] },
+  vintage: { label: 'Vintage', banner: [120, 53, 15], accent: [146, 64, 14], sidebar: [255, 251, 235] },
+}
+
+function toRgb(color: [number, number, number]): RGB {
+  return rgb(color[0] / 255, color[1] / 255, color[2] / 255)
+}
+
+function getFallbackStyle(templateId?: string): SimplePdfStyle {
+  if (!templateId) return FALLBACK_TEMPLATE_STYLES.modern
+  return FALLBACK_TEMPLATE_STYLES[templateId] ?? FALLBACK_TEMPLATE_STYLES.modern
+}
+
+async function generateSimplePdf(cvData: CVData, templateId?: string): Promise<Uint8Array> {
   const doc = await PDFDocument.create()
   const page = doc.addPage([595.28, 841.89]) // A4
   const font = await doc.embedFont(StandardFonts.Helvetica)
   const bold = await doc.embedFont(StandardFonts.HelveticaBold)
+  const style = getFallbackStyle(templateId)
+  const bannerColor = toRgb(style.banner)
+  const accentColor = toRgb(style.accent)
+  const sidebarColor = style.sidebar ? toRgb(style.sidebar) : null
+  const textColor = rgb(0.11, 0.11, 0.13)
+  const invertedText = rgb(1, 1, 1)
 
   const margin = 40
-  const width = page.getWidth() - margin * 2
-  let y = page.getHeight() - margin
+  const bannerHeight = 46
+  if (sidebarColor) {
+    page.drawRectangle({
+      x: 0,
+      y: 0,
+      width: 16,
+      height: page.getHeight(),
+      color: sidebarColor,
+    })
+  }
 
-  const drawWrapped = (text: string, size = 10, isBold = false) => {
+  page.drawRectangle({
+    x: 0,
+    y: page.getHeight() - bannerHeight,
+    width: page.getWidth(),
+    height: bannerHeight,
+    color: bannerColor,
+  })
+
+  page.drawText(`Template: ${style.label} (Compatibility PDF)`, {
+    x: margin,
+    y: page.getHeight() - 30,
+    size: 11,
+    font: bold,
+    color: invertedText,
+  })
+
+  const width = page.getWidth() - margin * 2
+  let y = page.getHeight() - bannerHeight - margin + 4
+
+  const drawWrapped = (text: string, size = 10, isBold = false, color: RGB = textColor) => {
     const activeFont = isBold ? bold : font
     const words = text.split(/\s+/)
     let line = ''
@@ -51,7 +119,7 @@ async function generateSimplePdf(cvData: CVData): Promise<Uint8Array> {
           y = margin
           return
         }
-        page.drawText(line, { x: margin, y, size, font: activeFont })
+        page.drawText(line, { x: margin, y, size, font: activeFont, color })
         y -= size + 4
         line = word
       }
@@ -61,14 +129,14 @@ async function generateSimplePdf(cvData: CVData): Promise<Uint8Array> {
         y = margin
         return
       }
-      page.drawText(line, { x: margin, y, size, font: activeFont })
+      page.drawText(line, { x: margin, y, size, font: activeFont, color })
       y -= size + 4
     }
   }
 
   const drawSectionTitle = (title: string) => {
     y -= 6
-    drawWrapped(title, 12, true)
+    drawWrapped(title, 12, true, accentColor)
     y -= 2
   }
 
@@ -225,10 +293,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No CV data provided' }, { status: 400 })
     }
 
+    const requestedTemplateId =
+      typeof templateId === 'string' && templateId.trim().length > 0 ? templateId.trim() : 'modern'
+
     const safeName = sanitizeFileName(title || cvData.basics?.name || 'cv')
 
     if (format === 'latex') {
-      const latex = generateLatex(cvData as CVData, templateId)
+      const latex = generateLatex(cvData as CVData, requestedTemplateId)
       return new NextResponse(latex, {
         headers: {
           'Content-Type': 'text/plain',
@@ -247,8 +318,9 @@ export async function POST(request: Request) {
     }
 
     const normalizedCV = cvData as CVData
-    const latex = generateLatex(normalizedCV, templateId)
+    const latex = generateLatex(normalizedCV, requestedTemplateId)
 
+    let renderMode: 'latex' | 'fallback' = 'latex'
     let pdfBytes: Uint8Array
     try {
       const pdfBuffer = await compileLatexToPdf(latex)
@@ -259,13 +331,16 @@ export async function POST(request: Request) {
         throw latexError
       }
       // Vercel/serverless-safe fallback when LaTeX binaries are unavailable.
-      pdfBytes = await generateSimplePdf(normalizedCV)
+      renderMode = 'fallback'
+      pdfBytes = await generateSimplePdf(normalizedCV, requestedTemplateId)
     }
 
     return new NextResponse(Buffer.from(pdfBytes), {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="${safeName}.pdf"`,
+        'X-CV-PDF-Renderer': renderMode,
+        'X-CV-PDF-Template': requestedTemplateId,
       },
     })
   } catch (error) {

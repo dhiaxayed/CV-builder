@@ -460,6 +460,10 @@ export default function CVEditorPage() {
         const error = await response.json().catch(() => ({}))
         throw new Error(error.message || 'Failed to generate PDF')
       }
+
+      const renderer = response.headers.get('x-cv-pdf-renderer')
+      const renderedTemplate = response.headers.get('x-cv-pdf-template')
+      const usedFallback = renderer === 'fallback'
       
       const blob = await response.blob()
       const url = URL.createObjectURL(blob)
@@ -471,8 +475,15 @@ export default function CVEditorPage() {
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
-      
-      toast({ title: 'PDF downloaded' })
+
+      if (usedFallback) {
+        toast({
+          title: 'PDF downloaded (compatibility mode)',
+          description: `LaTeX engine unavailable on server. Applied simplified ${renderedTemplate || cv?.template_id || 'template'} styling.`,
+        })
+      } else {
+        toast({ title: 'PDF downloaded' })
+      }
     } catch (error) {
       toast({ 
         title: error instanceof Error ? error.message : 'Failed to generate PDF', 
