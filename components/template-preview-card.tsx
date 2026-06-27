@@ -42,7 +42,7 @@ export function TemplatePreviewCard({
           selected && 'border-primary ring-2 ring-primary/20'
         )}
       >
-        <div className="relative aspect-[3/4] overflow-hidden bg-slate-100">
+        <div className="relative aspect-3/4 overflow-hidden bg-slate-100">
           <div className="absolute inset-0 overflow-hidden">
             <div
               className="pointer-events-none origin-top-left"
@@ -85,7 +85,8 @@ export function TemplatePreviewCard({
       </div>
 
       {popular && (
-        <Badge className="absolute -top-2 -right-2 bg-slate-950 text-white">
+        <Badge className="absolute -top-2 -right-2 gap-1.5 border border-emerald-400/30 bg-linear-to-r from-emerald-500 via-emerald-400 to-lime-400 px-3 py-1 text-xs font-semibold tracking-wide text-emerald-950 shadow-[0_10px_30px_rgba(16,185,129,0.28)]">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-950/70 shadow-[0_0_0_4px_rgba(6,78,59,0.10)]" />
           Popular
         </Badge>
       )}

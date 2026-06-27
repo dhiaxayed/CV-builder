@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState, type CSSProperties, type MouseEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { Button } from '@/components/ui/button'
@@ -53,9 +53,21 @@ const TEMPLATE_GROUPS = [
 ]
 
 const HERO_SIGNALS = [
-  { label: 'ATS signal', value: '92%', tone: 'bg-slate-950' },
-  { label: 'Layout polish', value: '16 templates', tone: 'bg-zinc-500' },
-  { label: 'Export flow', value: 'PDF + LaTeX', tone: 'bg-stone-400' },
+  {
+    label: 'ATS readiness',
+    value: '92%',
+    detail: 'Checks structure, keywords, readability, and recruiter scan quality.',
+  },
+  {
+    label: 'Template coverage',
+    value: '16 templates',
+    detail: 'Professional layouts with consistent hierarchy and spacing.',
+  },
+  {
+    label: 'AI workflow',
+    value: 'No code',
+    detail: 'No LaTeX or coding background needed. Prompt the AI and export.',
+  },
 ]
 
 function FeatureCard({
@@ -69,12 +81,22 @@ function FeatureCard({
   description: string
   badge?: string
 }) {
+  const badgeClassName =
+    badge === 'Popular'
+      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+      : badge === 'New'
+        ? 'border-sky-200 bg-sky-50 text-sky-700'
+        : 'border-zinc-200 bg-zinc-50 text-zinc-700'
+
   return (
     <Card className="group border border-zinc-200/90 bg-white transition-all duration-300 hover:-translate-y-1 hover:border-zinc-400 hover:shadow-[0_18px_45px_rgba(24,24,27,0.08)]">
       <CardContent className="pt-6">
         <div className="relative">
           {badge && (
-            <Badge className="absolute -top-2 -right-2 bg-slate-950 text-white">
+            <Badge className={`absolute -top-2 -right-2 gap-1.5 border px-2.5 py-1 text-[11px] font-semibold ${badgeClassName}`}>
+              {badge === 'Popular' && (
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,0.12)]" />
+              )}
               {badge}
             </Badge>
           )}
@@ -89,15 +111,35 @@ function FeatureCard({
   )
 }
 
+function GreenBullet({ children }: { children: string }) {
+  return (
+    <li className="flex items-start gap-2.5">
+      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+      <span className="leading-6">{children}</span>
+    </li>
+  )
+}
+
 export default function HomePage() {
   const { user, isLoading } = useAuth()
   const router = useRouter()
+  const [ctaPointer, setCtaPointer] = useState({ x: 50, y: 50, active: false })
 
   useEffect(() => {
     if (!isLoading && user) {
       router.push('/dashboard')
     }
   }, [isLoading, user, router])
+
+  const handleCtaPointerMove = (event: MouseEvent<HTMLElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect()
+
+    setCtaPointer({
+      x: ((event.clientX - bounds.left) / bounds.width) * 100,
+      y: ((event.clientY - bounds.top) / bounds.height) * 100,
+      active: true,
+    })
+  }
 
   if (isLoading) {
     return (
@@ -119,7 +161,10 @@ export default function HomePage() {
       <div className="executive-strip bg-zinc-950 px-4 py-2 text-center text-sm text-white">
         <span className="inline-flex items-center gap-2">
           <Sparkles className="h-4 w-4" />
-          <strong>NEW:</strong> AI-powered ATS scoring now available! Get instant feedback on your CV.
+          <Badge className="border border-white/10 bg-white/10 px-2 py-0.5 text-[10px] font-medium tracking-[0.18em] text-white">
+            New
+          </Badge>
+          <span>AI-powered ATS scoring now available. Get instant feedback on your CV.</span>
           <ChevronRight className="h-4 w-4" />
         </span>
       </div>
@@ -166,10 +211,10 @@ export default function HomePage() {
         <div className="container mx-auto max-w-6xl">
           <div className="motion-fade-up relative mb-8 text-center">
             <Badge variant="outline" className="mb-4 border-zinc-300 bg-white/80 px-4 py-1 text-zinc-700">
-              <Palette className="mr-1 h-3 w-3" />
-              Real template previews
+              <Sparkles className="mr-1 h-3 w-3" />
+              No LaTeX. No code. AI-powered.
             </Badge>
-            <h1 className="mb-6 bg-linear-to-r from-slate-950 via-slate-800 to-slate-950 bg-clip-text text-5xl font-bold tracking-tight text-transparent dark:from-white dark:via-slate-200 dark:to-white md:text-7xl">
+            <h1 className="mb-6 bg-linear-to-r from-slate-950 via-slate-800 to-slate-950 bg-clip-text text-5xl font-bold text-transparent dark:from-white dark:via-slate-200 dark:to-white md:text-7xl">
               Create ATS-Friendly CVs
               <br />
               <span className="bg-linear-to-r from-zinc-950 via-zinc-600 to-zinc-950 bg-clip-text text-transparent">
@@ -177,8 +222,8 @@ export default function HomePage() {
               </span>
             </h1>
             <p className="mx-auto mb-8 max-w-2xl text-xl text-muted-foreground">
-              Build professional CVs with ATS scoring, job description matching, version history,
-              and PDF export generated from your selected template.
+              Tell the AI what role you are targeting. It helps structure, refine, and export a polished
+              CV without requiring any LaTeX or coding background.
             </p>
             <div className="mb-8 flex flex-col justify-center gap-4 sm:flex-row">
               <Button
@@ -195,19 +240,34 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="motion-fade-up-delay mx-auto mt-12 max-w-5xl">
-            <div className="signal-panel grid gap-4 rounded-lg border border-zinc-200 bg-white/90 p-4 shadow-[0_24px_70px_rgba(24,24,27,0.08)] backdrop-blur md:grid-cols-3">
-              {HERO_SIGNALS.map((signal) => (
-                <div key={signal.label} className="relative overflow-hidden rounded-md border border-zinc-200 bg-white p-4">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <span className="text-sm font-medium text-zinc-600">{signal.label}</span>
-                    <span className="text-sm font-semibold text-zinc-950">{signal.value}</span>
-                  </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-zinc-100">
-                    <div className={`landing-progress h-full rounded-full ${signal.tone}`} />
-                  </div>
+          <div className="mx-auto mt-12 max-w-5xl">
+            <div className="signal-panel rounded-lg border border-zinc-200 bg-white/95 shadow-[0_24px_70px_rgba(24,24,27,0.08)] backdrop-blur">
+              <div className="flex items-start justify-between gap-4 border-b border-zinc-200 px-5 py-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
+                    Product signals
+                  </p>
+                  <p className="mt-1 max-w-2xl text-sm leading-6 text-zinc-600">
+                    A clear snapshot of the product value: AI guidance, structured templates, and clean export readiness.
+                  </p>
                 </div>
-              ))}
+                <Badge variant="outline" className="shrink-0 border-emerald-200 bg-emerald-50 text-emerald-700">
+                  AI assisted
+                </Badge>
+              </div>
+
+              <div className="grid divide-y divide-zinc-200 md:grid-cols-3 md:divide-x md:divide-y-0">
+                {HERO_SIGNALS.map((signal) => (
+                  <div
+                    key={signal.label}
+                    className="p-5"
+                  >
+                    <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-500">{signal.label}</p>
+                    <p className="mt-3 text-2xl font-semibold text-zinc-950">{signal.value}</p>
+                    <p className="text-sm leading-6 text-zinc-600">{signal.detail}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -215,14 +275,13 @@ export default function HomePage() {
 
       <section id="features" className="px-4 py-24">
         <div className="container mx-auto max-w-6xl">
-          <div className="motion-fade-up mb-16 text-center">
+          <div className="mb-16 text-center">
             <Badge variant="outline" className="mb-4">
               Features
             </Badge>
             <h2 className="mb-4 text-4xl font-bold">Everything You Need to Build a Stronger CV</h2>
             <p className="mx-auto max-w-2xl text-xl text-muted-foreground">
-              Core tools focused on editing, tailoring, and exporting your CV without filler content on
-              the landing page.
+              Focused tools for editing, tailoring, and exporting your CV with fewer distractions.
             </p>
           </div>
 
@@ -281,14 +340,14 @@ export default function HomePage() {
 
       <section className="bg-zinc-50 px-4 py-24">
         <div className="container mx-auto max-w-6xl">
-          <div className="motion-fade-up mb-16 text-center">
+          <div className="mb-16 text-center">
             <Badge variant="outline" className="mb-4">
               How It Works
             </Badge>
             <h2 className="mb-4 text-4xl font-bold">Build Your CV in 3 Simple Steps</h2>
           </div>
 
-          <div className="step-flow motion-fade-up-delay grid gap-8 md:grid-cols-3">
+          <div className="step-flow grid gap-8 md:grid-cols-3">
             {[
               {
                 step: '1',
@@ -309,16 +368,16 @@ export default function HomePage() {
                 icon: Download,
               },
             ].map(({ step, title, desc, icon: Icon }) => (
-              <div key={step} className={`step-flow-card step-flow-card-${step} relative rounded-lg border border-zinc-200 bg-white p-6 text-center shadow-[0_12px_35px_rgba(24,24,27,0.05)]`}>
-                <div className="relative z-10">
-                  <div className="step-flow-node mb-5 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-zinc-950 text-white">
+              <div key={step} className="step-flow-card relative rounded-lg border border-zinc-200 bg-white p-6 text-center shadow-[0_12px_35px_rgba(24,24,27,0.05)]">
+                <div className="relative z-10 flex h-full flex-col items-center">
+                  <div className="step-flow-node mb-5 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-zinc-950 text-white shadow-[0_12px_30px_rgba(24,24,27,0.14)]">
                     <Icon className="h-7 w-7" />
                   </div>
-                  <div className="mx-auto mb-3 flex h-6 w-6 items-center justify-center rounded-full border border-zinc-300 bg-white text-xs font-semibold text-zinc-700">
-                    {step}
-                  </div>
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-600">
+                    Step {step}
+                  </p>
                   <h3 className="mb-2 text-xl font-semibold">{title}</h3>
-                  <p className="text-muted-foreground">{desc}</p>
+                  <p className="text-sm leading-6 text-muted-foreground">{desc}</p>
                 </div>
               </div>
             ))}
@@ -393,10 +452,7 @@ export default function HomePage() {
                     'Version history',
                     'Shareable CV link',
                   ].map((feature) => (
-                    <li key={feature} className="flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full bg-zinc-900" />
-                      <span>{feature}</span>
-                    </li>
+                    <GreenBullet key={feature}>{feature}</GreenBullet>
                   ))}
                 </ul>
                 <Button className="w-full" variant="outline" onClick={() => router.push('/auth/signin')}>
@@ -406,7 +462,13 @@ export default function HomePage() {
             </Card>
 
             <Card className="relative overflow-hidden border-2 border-zinc-950 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_18px_45px_rgba(24,24,27,0.12)]">
-              <div className="absolute top-0 right-0 rounded-bl-lg bg-zinc-950 px-3 py-1 text-xs text-white">
+              <div
+                className="absolute top-0 right-0 flex items-center gap-1.5 rounded-bl-lg border border-emerald-200 px-3 py-1 text-xs font-semibold tracking-wide text-emerald-700 shadow-[0_10px_30px_rgba(24,24,27,0.06)]"
+                style={{
+                  backgroundImage: 'linear-gradient(90deg, rgb(236 253 245), rgb(220 252 231), rgb(240 253 244))',
+                }}
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,0.12)]" />
                 Popular
               </div>
               <CardContent className="pt-6">
@@ -424,10 +486,7 @@ export default function HomePage() {
                     'Tailored summary and bullet rewrite package',
                     'Saved job-targeting history',
                   ].map((feature) => (
-                    <li key={feature} className="flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full bg-zinc-900" />
-                      <span>{feature}</span>
-                    </li>
+                    <GreenBullet key={feature}>{feature}</GreenBullet>
                   ))}
                 </ul>
                 <Button
@@ -446,17 +505,40 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="bg-zinc-950 px-4 py-24 text-white">
-        <div className="motion-fade-up container mx-auto grid max-w-6xl items-center gap-10 md:grid-cols-[1.05fr_0.95fr]">
+      <section
+        className={`cta-stage relative overflow-hidden bg-zinc-950 px-4 py-24 text-white ${ctaPointer.active ? 'cta-stage-active' : ''}`}
+        style={
+          {
+            '--cta-x': `${ctaPointer.x}%`,
+            '--cta-y': `${ctaPointer.y}%`,
+          } as CSSProperties
+        }
+        onMouseMove={handleCtaPointerMove}
+        onMouseLeave={() => setCtaPointer((current) => ({ ...current, active: false }))}
+      >
+        <div className="cta-interactive-field pointer-events-none absolute inset-0" aria-hidden="true" />
+        <div
+          className="cta-cursor-mark pointer-events-none absolute hidden h-20 w-20 -translate-x-1/2 -translate-y-1/2 md:block"
+          style={{
+            left: `${ctaPointer.x}%`,
+            top: `${ctaPointer.y}%`,
+            opacity: ctaPointer.active ? 1 : 0,
+          }}
+          aria-hidden="true"
+        >
+          <span className="cta-cursor-cross cta-cursor-cross-x" />
+          <span className="cta-cursor-cross cta-cursor-cross-y" />
+        </div>
+        <div className="container relative mx-auto grid max-w-6xl items-center gap-10 md:grid-cols-[1.05fr_0.95fr]">
           <div>
-            <Badge className="mb-5 border border-white/15 bg-white/10 text-white hover:bg-white/10">
-              Designed for focused applications
+            <Badge className="mb-5 border border-emerald-400/20 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/10">
+              AI-powered CV building
             </Badge>
-            <h2 className="mb-5 max-w-2xl text-4xl font-bold tracking-tight md:text-5xl">
+            <h2 className="mb-5 max-w-2xl text-4xl font-bold md:text-5xl">
               Ready to Build a Stronger CV?
             </h2>
             <p className="mb-8 max-w-xl text-lg leading-8 text-zinc-300">
-              Start with a real template preview, tailor your content for the role, and export a polished PDF with a clean professional finish.
+              No coding, no LaTeX setup, no formatting guesswork. Prompt the AI, refine your content, and export a polished CV from a real template.
             </p>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <Button
@@ -472,7 +554,10 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="cta-flow rounded-lg border border-white/10 bg-white/[0.03] p-5">
+          <div
+            className="cta-flow rounded-lg border border-white/10 p-5 shadow-[0_18px_50px_rgba(0,0,0,0.28)] backdrop-blur-md"
+            style={{ backgroundColor: 'rgba(255, 255, 255, 0.03)' }}
+          >
             {[
               { label: 'Template selected', detail: 'Structure and hierarchy locked', icon: Palette },
               { label: 'Content refined', detail: 'ATS review and role targeting applied', icon: Sparkles },
