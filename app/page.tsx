@@ -53,9 +53,9 @@ const TEMPLATE_GROUPS = [
 ]
 
 const HERO_SIGNALS = [
-  { label: 'ATS signal', value: '92%', tone: 'bg-teal-500' },
-  { label: 'Layout polish', value: '16 templates', tone: 'bg-blue-500' },
-  { label: 'Export flow', value: 'PDF + LaTeX', tone: 'bg-amber-500' },
+  { label: 'ATS signal', value: '92%', tone: 'bg-slate-950' },
+  { label: 'Layout polish', value: '16 templates', tone: 'bg-zinc-500' },
+  { label: 'Export flow', value: 'PDF + LaTeX', tone: 'bg-stone-400' },
 ]
 
 function FeatureCard({
@@ -70,7 +70,7 @@ function FeatureCard({
   badge?: string
 }) {
   return (
-    <Card className="group border border-slate-200/80 bg-card/95 transition-all duration-300 hover:-translate-y-1 hover:border-teal-500/30 hover:shadow-[0_18px_45px_rgba(15,23,42,0.10)]">
+    <Card className="group border border-zinc-200/90 bg-white transition-all duration-300 hover:-translate-y-1 hover:border-zinc-400 hover:shadow-[0_18px_45px_rgba(24,24,27,0.08)]">
       <CardContent className="pt-6">
         <div className="relative">
           {badge && (
@@ -78,8 +78,8 @@ function FeatureCard({
               {badge}
             </Badge>
           )}
-          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-linear-to-br from-slate-900/10 to-teal-600/10 transition-transform group-hover:scale-110">
-            <Icon className="h-7 w-7 text-teal-700" />
+          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-zinc-100 transition-transform group-hover:scale-105">
+            <Icon className="h-7 w-7 text-zinc-900" />
           </div>
         </div>
         <h3 className="mb-2 text-xl font-semibold">{title}</h3>
@@ -106,7 +106,7 @@ export default function HomePage() {
           <div className="rounded-xl bg-primary p-3">
             <FileText className="h-8 w-8 text-primary-foreground" />
           </div>
-          <span className="bg-linear-to-r from-slate-950 to-teal-700 bg-clip-text text-2xl font-bold text-transparent">
+          <span className="bg-linear-to-r from-zinc-950 to-zinc-600 bg-clip-text text-2xl font-bold text-transparent">
             CV Builder
           </span>
         </div>
@@ -116,7 +116,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="professional-sheen bg-slate-950 px-4 py-2 text-center text-sm text-white">
+      <div className="executive-strip bg-zinc-950 px-4 py-2 text-center text-sm text-white">
         <span className="inline-flex items-center gap-2">
           <Sparkles className="h-4 w-4" />
           <strong>NEW:</strong> AI-powered ATS scoring now available! Get instant feedback on your CV.
@@ -160,19 +160,19 @@ export default function HomePage() {
         </div>
       </header>
 
-      <section className="relative overflow-hidden border-b bg-slate-50 px-4 py-20">
+      <section className="relative overflow-hidden border-b bg-white px-4 py-20">
         <div className="landing-grid pointer-events-none absolute inset-0" />
 
         <div className="container mx-auto max-w-6xl">
           <div className="motion-fade-up relative mb-8 text-center">
-            <Badge variant="outline" className="mb-4 border-teal-700/30 bg-white/80 px-4 py-1 text-teal-800">
+            <Badge variant="outline" className="mb-4 border-zinc-300 bg-white/80 px-4 py-1 text-zinc-700">
               <Palette className="mr-1 h-3 w-3" />
               Real template previews
             </Badge>
             <h1 className="mb-6 bg-linear-to-r from-slate-950 via-slate-800 to-slate-950 bg-clip-text text-5xl font-bold tracking-tight text-transparent dark:from-white dark:via-slate-200 dark:to-white md:text-7xl">
               Create ATS-Friendly CVs
               <br />
-              <span className="bg-linear-to-r from-blue-800 via-teal-700 to-slate-900 bg-clip-text text-transparent">
+              <span className="bg-linear-to-r from-zinc-950 via-zinc-600 to-zinc-950 bg-clip-text text-transparent">
                 With Templates You Can Actually Preview
               </span>
             </h1>
@@ -196,14 +196,14 @@ export default function HomePage() {
           </div>
 
           <div className="motion-fade-up-delay mx-auto mt-12 max-w-5xl">
-            <div className="workflow-rail grid gap-4 rounded-lg border border-slate-200 bg-white/85 p-4 shadow-[0_24px_70px_rgba(15,23,42,0.10)] backdrop-blur md:grid-cols-3">
+            <div className="signal-panel grid gap-4 rounded-lg border border-zinc-200 bg-white/90 p-4 shadow-[0_24px_70px_rgba(24,24,27,0.08)] backdrop-blur md:grid-cols-3">
               {HERO_SIGNALS.map((signal) => (
-                <div key={signal.label} className="relative overflow-hidden rounded-md border border-slate-200 bg-white p-4">
+                <div key={signal.label} className="relative overflow-hidden rounded-md border border-zinc-200 bg-white p-4">
                   <div className="mb-3 flex items-center justify-between gap-3">
-                    <span className="text-sm font-medium text-slate-700">{signal.label}</span>
-                    <span className="text-sm font-semibold text-slate-950">{signal.value}</span>
+                    <span className="text-sm font-medium text-zinc-600">{signal.label}</span>
+                    <span className="text-sm font-semibold text-zinc-950">{signal.value}</span>
                   </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                  <div className="h-2 overflow-hidden rounded-full bg-zinc-100">
                     <div className={`landing-progress h-full rounded-full ${signal.tone}`} />
                   </div>
                 </div>
@@ -279,7 +279,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="bg-slate-50 px-4 py-24">
+      <section className="bg-zinc-50 px-4 py-24">
         <div className="container mx-auto max-w-6xl">
           <div className="motion-fade-up mb-16 text-center">
             <Badge variant="outline" className="mb-4">
@@ -288,7 +288,7 @@ export default function HomePage() {
             <h2 className="mb-4 text-4xl font-bold">Build Your CV in 3 Simple Steps</h2>
           </div>
 
-          <div className="motion-fade-up-delay grid gap-8 md:grid-cols-3">
+          <div className="step-flow motion-fade-up-delay grid gap-8 md:grid-cols-3">
             {[
               {
                 step: '1',
@@ -308,18 +308,18 @@ export default function HomePage() {
                 desc: 'Export to PDF and tailor versions for different roles',
                 icon: Download,
               },
-            ].map(({ step, title, desc }) => (
-              <div key={step} className="relative">
-                <div className="text-center">
-                  <div className="design-pulse mb-4 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-950 text-2xl font-bold text-white">
+            ].map(({ step, title, desc, icon: Icon }) => (
+              <div key={step} className={`step-flow-card step-flow-card-${step} relative rounded-lg border border-zinc-200 bg-white p-6 text-center shadow-[0_12px_35px_rgba(24,24,27,0.05)]`}>
+                <div className="relative z-10">
+                  <div className="step-flow-node mb-5 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-zinc-950 text-white">
+                    <Icon className="h-7 w-7" />
+                  </div>
+                  <div className="mx-auto mb-3 flex h-6 w-6 items-center justify-center rounded-full border border-zinc-300 bg-white text-xs font-semibold text-zinc-700">
                     {step}
                   </div>
                   <h3 className="mb-2 text-xl font-semibold">{title}</h3>
                   <p className="text-muted-foreground">{desc}</p>
                 </div>
-                {step !== '3' && (
-                  <ArrowRight className="absolute top-8 -right-4 hidden h-8 w-8 text-muted-foreground/30 md:block" />
-                )}
               </div>
             ))}
           </div>
@@ -394,7 +394,7 @@ export default function HomePage() {
                     'Shareable CV link',
                   ].map((feature) => (
                     <li key={feature} className="flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full bg-green-600" />
+                      <span className="h-2 w-2 rounded-full bg-zinc-900" />
                       <span>{feature}</span>
                     </li>
                   ))}
@@ -405,8 +405,8 @@ export default function HomePage() {
               </CardContent>
             </Card>
 
-            <Card className="relative overflow-hidden border-2 border-teal-700 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_18px_45px_rgba(15,23,42,0.14)]">
-              <div className="absolute top-0 right-0 rounded-bl-lg bg-teal-700 px-3 py-1 text-xs text-white">
+            <Card className="relative overflow-hidden border-2 border-zinc-950 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_18px_45px_rgba(24,24,27,0.12)]">
+              <div className="absolute top-0 right-0 rounded-bl-lg bg-zinc-950 px-3 py-1 text-xs text-white">
                 Popular
               </div>
               <CardContent className="pt-6">
@@ -425,7 +425,7 @@ export default function HomePage() {
                     'Saved job-targeting history',
                   ].map((feature) => (
                     <li key={feature} className="flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full bg-green-600" />
+                      <span className="h-2 w-2 rounded-full bg-zinc-900" />
                       <span>{feature}</span>
                     </li>
                   ))}
@@ -441,29 +441,54 @@ export default function HomePage() {
           </div>
 
           <p className="mt-6 text-center text-sm text-muted-foreground">
-            Backend-enforced limits: Free = 1 CV max, AI Job Tailoring = Pro only.
+            Free includes one polished CV. Pro adds unlimited CVs, advanced AI tailoring, and saved job-targeting history.
           </p>
         </div>
       </section>
 
-      <section className="professional-sheen bg-slate-950 px-4 py-24 text-white">
-        <div className="motion-fade-up container mx-auto max-w-3xl text-center">
-          <h2 className="mb-4 text-4xl font-bold md:text-5xl">Ready to Build a Stronger CV?</h2>
-          <p className="mb-8 text-xl text-white/80">
-            Start with a real template preview, tailor your content, and export a polished PDF.
-          </p>
-          <div className="flex flex-col justify-center gap-4 sm:flex-row">
-            <Button
-              size="lg"
-              variant="secondary"
-              className="h-14 px-8 text-lg"
-              onClick={() => router.push('/auth/signin')}
-            >
-              Create Your CV Now
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
+      <section className="bg-zinc-950 px-4 py-24 text-white">
+        <div className="motion-fade-up container mx-auto grid max-w-6xl items-center gap-10 md:grid-cols-[1.05fr_0.95fr]">
+          <div>
+            <Badge className="mb-5 border border-white/15 bg-white/10 text-white hover:bg-white/10">
+              Designed for focused applications
+            </Badge>
+            <h2 className="mb-5 max-w-2xl text-4xl font-bold tracking-tight md:text-5xl">
+              Ready to Build a Stronger CV?
+            </h2>
+            <p className="mb-8 max-w-xl text-lg leading-8 text-zinc-300">
+              Start with a real template preview, tailor your content for the role, and export a polished PDF with a clean professional finish.
+            </p>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <Button
+                size="lg"
+                variant="secondary"
+                className="h-14 px-8 text-lg transition-transform hover:-translate-y-0.5"
+                onClick={() => router.push('/auth/signin')}
+              >
+                Create Your CV Now
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+              <span className="text-sm text-zinc-400">Free plan available. No credit card required.</span>
+            </div>
           </div>
-          <p className="mt-4 text-sm text-white/60">Free forever plan available | No credit card required</p>
+
+          <div className="cta-flow rounded-lg border border-white/10 bg-white/[0.03] p-5">
+            {[
+              { label: 'Template selected', detail: 'Structure and hierarchy locked', icon: Palette },
+              { label: 'Content refined', detail: 'ATS review and role targeting applied', icon: Sparkles },
+              { label: 'Export ready', detail: 'PDF, LaTeX, and share link prepared', icon: Download },
+            ].map(({ label, detail, icon: Icon }) => (
+              <div key={label} className="cta-flow-row">
+                <div className="cta-flow-icon">
+                  <Icon className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-white">{label}</p>
+                  <p className="text-sm text-zinc-400">{detail}</p>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -505,7 +530,7 @@ export default function HomePage() {
               <h4 className="mb-4 font-semibold">Plans</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li>Free: 1 CV</li>
-                <li>Pro: manually activated in the database</li>
+                <li>Pro: unlimited CVs and AI tailoring</li>
               </ul>
             </div>
             <div>
