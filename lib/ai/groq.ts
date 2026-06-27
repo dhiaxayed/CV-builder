@@ -29,7 +29,7 @@ function getGroqHeaders() {
   const apiKey = process.env.GROQ_API_KEY
 
   if (!apiKey) {
-    throw new Error('GROQ_API_KEY is missing. Add it to .env.local to enable AI features.')
+    throw new Error('GROQ_API_KEY is missing. Add it to Vercel Environment Variables or .env.local, then redeploy to enable AI features.')
   }
 
   return {

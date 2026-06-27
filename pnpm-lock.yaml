@@ -137,6 +137,9 @@ importers:
       next-themes:
         specifier: ^0.4.6
         version: 0.4.6(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
+      node-latex-compiler:
+        specifier: ^1.0.5
+        version: 1.0.5
       nodemailer:
         specifier: ^7.0.12
         version: 7.0.12
@@ -810,6 +813,26 @@ packages:
   '@next/swc-win32-x64-msvc@16.0.10':
     resolution: {integrity: sha512-E+njfCoFLb01RAFEnGZn6ERoOqhK1Gl3Lfz1Kjnj0Ulfu7oJbuMyvBKNj/bw8XZnenHDASlygTjZICQW+rYW1Q==}
     engines: {node: '>= 10'}
+    cpu: [x64]
+    os: [win32]
+
+  '@node-latex-compiler/bin-darwin-arm64@1.0.5':
+    resolution: {integrity: sha512-3tNfSuxfgeyYNrjx+yxWiuuiCkhU4XLDNEsXTzrswzXeWnC9edl5ig4p5+IaMfwSFwGZDBHL1hbuqyGKYB2kBg==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@node-latex-compiler/bin-darwin-x64@1.0.5':
+    resolution: {integrity: sha512-A1e1tBTFDUw74aaiS40h2/QIgvqIdYEUUSO374lwzx6JVrnMeRLEebSKmWqaoDhib21qiGUe2WC+Lnfu5Wzmpg==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@node-latex-compiler/bin-linux-x64@1.0.5':
+    resolution: {integrity: sha512-DyeCdSn9YY7UQs1ZDaEhNMsYTHG7LtThM0Qsy7TYxBsD/bYysMwsGeeG/11Cw5IOiz4+Zn1Qn90sdFz5o/YgVA==}
+    cpu: [x64]
+    os: [linux]
+
+  '@node-latex-compiler/bin-win32-x64@1.0.5':
+    resolution: {integrity: sha512-cxFqTjLmkkCypTvWLbJrg05xonCehXHnoEylpG5O/5vFtlxyRrSCyja0srMNzQjdA1nGrT5VTQ2I3ilWA9PFYQ==}
     cpu: [x64]
     os: [win32]
 
@@ -2150,6 +2173,10 @@ packages:
       sass:
         optional: true
 
+  node-latex-compiler@1.0.5:
+    resolution: {integrity: sha512-KppBZZ5VwJsvIobYETruv8pW53RYU2OJmcYCDznoib8umFtQjFsVoQvqX630b6Na67I7IKOus3sxK5Uu5J1pdg==}
+    engines: {node: '>= 14.x'}
+
   node-releases@2.0.27:
     resolution: {integrity: sha512-nmh3lCkYZ3grZvqcCH+fjmQ7X+H0OeZgP40OierEaAptX4XofMh5kwNbWh7lBduUzCcV/8kZ+NDLCwm2iorIlA==}
 
@@ -3146,6 +3173,18 @@ snapshots:
     optional: true
 
   '@next/swc-win32-x64-msvc@16.0.10':
+    optional: true
+
+  '@node-latex-compiler/bin-darwin-arm64@1.0.5':
+    optional: true
+
+  '@node-latex-compiler/bin-darwin-x64@1.0.5':
+    optional: true
+
+  '@node-latex-compiler/bin-linux-x64@1.0.5':
+    optional: true
+
+  '@node-latex-compiler/bin-win32-x64@1.0.5':
     optional: true
 
   '@playwright/test@1.58.0':
@@ -4584,6 +4623,13 @@ snapshots:
     transitivePeerDependencies:
       - '@babel/core'
       - babel-plugin-macros
+
+  node-latex-compiler@1.0.5:
+    optionalDependencies:
+      '@node-latex-compiler/bin-darwin-arm64': 1.0.5
+      '@node-latex-compiler/bin-darwin-x64': 1.0.5
+      '@node-latex-compiler/bin-linux-x64': 1.0.5
+      '@node-latex-compiler/bin-win32-x64': 1.0.5
 
   node-releases@2.0.27: {}
 

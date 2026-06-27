@@ -4,36 +4,55 @@ PDF export is intentionally LaTeX-only. The app generates `.tex`, compiles it wi
 
 ## Required runtime
 
-The production runtime must have one of these commands installed:
+The production runtime must provide one real LaTeX engine:
 
 - `pdflatex`
 - `xelatex`
+- bundled `tectonic` via `node-latex-compiler`
 
-`LATEX_CMD` only selects the command to execute. It does not install LaTeX.
+`LATEX_CMD` only selects a system command to execute. It does not install `pdflatex` or `xelatex`.
 
-## Vercel limitation
+## Vercel
 
-Vercel serverless functions do not include a TeX distribution by default, so PDF export fails with:
+Vercel serverless functions do not include a TeX Live system install, so calling `pdflatex` directly fails with:
 
 ```text
 spawn pdflatex ENOENT
 ```
 
-That error means the server cannot find the LaTeX executable. It is not a CV template issue.
+For Vercel, use the bundled Tectonic renderer:
 
-For production PDF export, use one of these real LaTeX runtimes:
+```env
+LATEX_RENDERER=tectonic
+```
 
-- Deploy this app with the included `Dockerfile`, which installs TeX Live.
-- Deploy a separate PDF worker/container with TeX Live and call it from the app.
-- Use a server/VPS where TeX Live or MiKTeX is installed and set `LATEX_CMD` if needed.
+Do not set `LATEX_CMD=pdflatex` on Vercel unless you intentionally want to test the missing system binary path.
 
-## Docker deployment
+Tectonic is a real LaTeX engine. The first cold compile can be slower because packages may be initialized/downloaded by the engine.
+
+## Docker/VPS
 
 The included `Dockerfile` installs TeX Live packages required for the PDF renderer. In Docker production, prefer:
 
 ```env
+LATEX_RENDERER=auto
 LATEX_CMD=xelatex
 ```
+
+## Modes
+
+```env
+# Try system pdflatex/xelatex, then Tectonic fallback.
+LATEX_RENDERER=auto
+
+# Use only pdflatex/xelatex from the server.
+LATEX_RENDERER=system
+
+# Use bundled Tectonic only. Recommended for Vercel.
+LATEX_RENDERER=tectonic
+```
+
+If `LATEX_RENDERER=system`, the production runtime must have `pdflatex` or `xelatex` installed.
 
 Check runtime readiness with:
 

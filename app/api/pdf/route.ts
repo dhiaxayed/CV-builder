@@ -9,20 +9,24 @@ import { tmpdir } from 'os'
 import path from 'path'
 import { spawn } from 'child_process'
 import sharp from 'sharp'
+import { compile as compileWithTectonic } from 'node-latex-compiler'
 
 export const runtime = 'nodejs'
-export const maxDuration = 60
+export const maxDuration = 300
 
 const MAX_PDF_PHOTO_BYTES = 5 * 1024 * 1024
 const DEFAULT_LATEX_COMMANDS = ['pdflatex', 'xelatex']
+const LATEX_RENDERERS = ['auto', 'system', 'tectonic'] as const
+
+type LatexRenderer = (typeof LATEX_RENDERERS)[number]
 
 class LatexEngineNotFoundError extends Error {
   readonly commands: string[]
 
   constructor(commands: string[], lastError?: string) {
     const runtimeHint = process.env.VERCEL
-      ? 'Vercel serverless functions do not include a TeX distribution. Deploy the app with the Dockerfile/runtime that installs TeX Live, or move PDF compilation to a LaTeX worker.'
-      : 'Install TeX Live or MiKTeX on the server, or set LATEX_CMD to the absolute path of an installed LaTeX engine.'
+      ? 'Vercel serverless functions do not include pdflatex/xelatex. Set LATEX_RENDERER=tectonic to use the bundled Tectonic LaTeX engine on Vercel.'
+      : 'Install TeX Live or MiKTeX on the server, set LATEX_RENDERER=tectonic, or set LATEX_CMD to the absolute path of an installed LaTeX engine.'
 
     super(
       `LaTeX engine not found. Tried: ${commands.join(', ')}. ${runtimeHint}${
@@ -46,11 +50,35 @@ function getLatexCommands(): string[] {
   return configuredCommand ? [configuredCommand] : DEFAULT_LATEX_COMMANDS
 }
 
+function getLatexRenderer(): LatexRenderer {
+  const renderer = process.env.LATEX_RENDERER?.trim().toLowerCase()
+  return LATEX_RENDERERS.includes(renderer as LatexRenderer) ? (renderer as LatexRenderer) : 'auto'
+}
+
 function isSpawnNotFound(error: unknown): boolean {
   return (
     error instanceof Error &&
     'code' in error &&
     (error as NodeJS.ErrnoException).code === 'ENOENT'
+  )
+}
+
+async function compileLatexWithTectonic(texPath: string, tempDir: string): Promise<Buffer> {
+  const result = await compileWithTectonic({
+    texFile: texPath,
+    outputDir: tempDir,
+    returnBuffer: true,
+  })
+
+  if (result.status === 'success' && result.pdfBuffer) {
+    return Buffer.from(result.pdfBuffer)
+  }
+
+  throw new LatexCompilationError(
+    result.error ||
+      result.stderr ||
+      result.stdout ||
+      'Tectonic LaTeX compilation failed.'
   )
 }
 
@@ -137,7 +165,8 @@ async function compileLatexToPdf(latex: string, cvData?: CVData): Promise<Buffer
 
     await fs.writeFile(texPath, latexSource, 'utf8')
 
-    const commands = getLatexCommands()
+    const renderer = getLatexRenderer()
+    const commands = renderer === 'tectonic' ? [] : getLatexCommands()
 
     let lastError = ''
     let missingEngineCount = 0
@@ -167,7 +196,15 @@ async function compileLatexToPdf(latex: string, cvData?: CVData): Promise<Buffer
       }
     }
 
-    if (missingEngineCount === commands.length) {
+    if (renderer !== 'system') {
+      try {
+        return await compileLatexWithTectonic(texPath, tempDir)
+      } catch (error) {
+        lastError = error instanceof Error ? error.message : String(error)
+      }
+    }
+
+    if (commands.length > 0 && missingEngineCount === commands.length) {
       throw new LatexEngineNotFoundError(commands, lastError)
     }
 

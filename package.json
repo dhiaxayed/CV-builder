@@ -56,6 +56,7 @@
     "nanoid": "5.1.6",
     "next": "16.0.10",
     "next-themes": "^0.4.6",
+    "node-latex-compiler": "^1.0.5",
     "nodemailer": "^7.0.12",
     "pdf-parse": "^2.4.5",
     "react": "19.2.0",
