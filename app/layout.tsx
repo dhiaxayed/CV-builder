@@ -14,7 +14,12 @@ export const metadata: Metadata = {
   description: 'Build professional, ATS-optimized CVs with real-time feedback, job description matching, and beautiful LaTeX-generated PDFs.',
   generator: 'cv-builder',
   icons: {
+    shortcut: '/favicon.ico',
     icon: [
+      {
+        url: '/favicon.ico',
+        sizes: '32x32',
+      },
       {
         url: '/icon-light-32x32.png',
         media: '(prefers-color-scheme: light)',
