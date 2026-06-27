@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
 import { spawn } from 'child_process'
-import {
-  getVersion as getTectonicVersion,
-  isAvailable as isTectonicAvailable,
-} from 'node-latex-compiler'
+import { createCompiler } from 'node-latex-compiler'
+import { promises as fs } from 'fs'
+import { tmpdir } from 'os'
+import path from 'path'
 
 export const dynamic = 'force-dynamic'
 
@@ -60,15 +60,75 @@ async function checkCommand(command: string): Promise<{ command: string; availab
   })
 }
 
-async function checkTectonic(): Promise<{ available: boolean; version?: string | null }> {
+function resolveTectonicPath(): string | null {
   try {
-    if (!isTectonicAvailable()) return { available: false }
-
-    return {
-      available: true,
-      version: await getTectonicVersion(),
+    const compiler = createCompiler() as unknown as {
+      isAvailable: () => boolean
+      tectonicPath?: string | null
     }
+
+    return compiler.isAvailable() && compiler.tectonicPath ? compiler.tectonicPath : null
   } catch {
+    return null
+  }
+}
+
+async function getTectonicRuntimeEnv() {
+  const cacheDir = path.join(tmpdir(), 'tectonic-cache')
+  const libraryPath = path.join(process.cwd(), 'vendor', 'tectonic-linux-x64', 'lib')
+  await fs.mkdir(cacheDir, { recursive: true })
+
+  return {
+    ...process.env,
+    HOME: tmpdir(),
+    XDG_CACHE_HOME: process.env.XDG_CACHE_HOME || cacheDir,
+    TECTONIC_CACHE_DIR: process.env.TECTONIC_CACHE_DIR || cacheDir,
+    LD_LIBRARY_PATH: process.env.LD_LIBRARY_PATH
+      ? `${libraryPath}:${process.env.LD_LIBRARY_PATH}`
+      : libraryPath,
+  }
+}
+
+async function checkTectonic(): Promise<{ available: boolean; version?: string | null; error?: string }> {
+  const tectonicPath = resolveTectonicPath()
+  if (!tectonicPath) return { available: false, error: 'Bundled Tectonic executable was not found.' }
+
+  try {
+    const env = await getTectonicRuntimeEnv()
+
+    return await new Promise((resolve) => {
+      const child = spawn(tectonicPath, ['--version'], { env })
+      let output = ''
+      let errorOutput = ''
+
+      const timeout = setTimeout(() => {
+        child.kill()
+        resolve({ available: false, error: 'Tectonic version check timed out.' })
+      }, 5000)
+
+      child.stdout.on('data', (chunk) => {
+        output += chunk.toString()
+      })
+
+      child.stderr.on('data', (chunk) => {
+        errorOutput += chunk.toString()
+      })
+
+      child.on('error', (error) => {
+        clearTimeout(timeout)
+        resolve({ available: false, error: error.message })
+      })
+
+      child.on('close', (code) => {
+        clearTimeout(timeout)
+        resolve({
+          available: code === 0,
+          version: output.split('\n')[0]?.trim() || undefined,
+          error: code === 0 ? undefined : errorOutput || output || `Tectonic exited with code ${code}.`,
+        })
+      })
+    })
+  } catch (error) {
     return { available: false }
   }
 }

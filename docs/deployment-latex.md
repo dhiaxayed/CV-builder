@@ -30,6 +30,8 @@ Do not set `LATEX_CMD=pdflatex` on Vercel unless you intentionally want to test 
 
 Tectonic is a real LaTeX engine. The first cold compile can be slower because packages may be initialized/downloaded by the engine.
 
+The Linux Tectonic binary also needs `libgraphite2.so.3`. On Vercel this repository installs that runtime library during `postinstall` into `vendor/tectonic-linux-x64/lib`, and the PDF route sets `LD_LIBRARY_PATH` before spawning Tectonic.
+
 ## Docker/VPS
 
 The included `Dockerfile` installs TeX Live packages required for the PDF renderer. In Docker production, prefer:

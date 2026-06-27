@@ -76,20 +76,37 @@ function resolveTectonicPath(): string {
   return compiler.tectonicPath
 }
 
+function getTectonicLibraryPath() {
+  return path.join(process.cwd(), 'vendor', 'tectonic-linux-x64', 'lib')
+}
+
+async function getTectonicRuntimeEnv() {
+  const cacheDir = path.join(tmpdir(), 'tectonic-cache')
+  const libraryPath = getTectonicLibraryPath()
+  await fs.mkdir(cacheDir, { recursive: true })
+
+  const existingLibraryPath = process.env.LD_LIBRARY_PATH
+  const nextLibraryPath = existingLibraryPath
+    ? `${libraryPath}:${existingLibraryPath}`
+    : libraryPath
+
+  return {
+    ...process.env,
+    HOME: tmpdir(),
+    XDG_CACHE_HOME: process.env.XDG_CACHE_HOME || cacheDir,
+    TECTONIC_CACHE_DIR: process.env.TECTONIC_CACHE_DIR || cacheDir,
+    LD_LIBRARY_PATH: nextLibraryPath,
+  }
+}
+
 async function compileLatexWithTectonic(texPath: string, tempDir: string): Promise<Buffer> {
   const tectonicPath = resolveTectonicPath()
-  const cacheDir = path.join(tmpdir(), 'tectonic-cache')
-  await fs.mkdir(cacheDir, { recursive: true })
+  const env = await getTectonicRuntimeEnv()
 
   const result = await new Promise<{ code: number | null; stdout: string; stderr: string }>((resolve, reject) => {
     const child = spawn(tectonicPath, [texPath, `--outdir=${tempDir}`], {
       cwd: tempDir,
-      env: {
-        ...process.env,
-        HOME: tmpdir(),
-        XDG_CACHE_HOME: process.env.XDG_CACHE_HOME || cacheDir,
-        TECTONIC_CACHE_DIR: process.env.TECTONIC_CACHE_DIR || cacheDir,
-      },
+      env,
     })
 
     let stdout = ''

@@ -209,6 +209,7 @@ export async function generateAtsReview({
   try {
     const review = await generateStructuredObject({
       schema: aiAtsReviewSchema,
+      maxCompletionTokens: 3600,
       shapeInstructions: JSON.stringify(
         {
           overallScore: 'integer 0-100',
@@ -307,6 +308,7 @@ export async function generateJobTailorAnalysis({
       extractedKeywords,
       analysis: await generateStructuredObject({
         schema: aiJobTailorSchema,
+        maxCompletionTokens: 5200,
         shapeInstructions: JSON.stringify(
           {
             targetRole: 'string',

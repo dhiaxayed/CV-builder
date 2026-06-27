@@ -6,6 +6,7 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "tsc --noEmit",
+    "postinstall": "node scripts/install-tectonic-runtime-libs.mjs",
     "test": "pnpm test:e2e",
     "start": "next start",
     "db:migrate": "npx tsx scripts/run-migration.ts",

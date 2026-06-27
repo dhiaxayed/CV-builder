@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+const scoreSchema = z.coerce.number().transform(Math.round).pipe(z.number().int().min(0).max(100))
+
 export const aiPriorityActionSchema = z.object({
   title: z.string(),
   reason: z.string(),
@@ -14,14 +16,14 @@ export const aiSectionFeedbackSchema = z.object({
 })
 
 export const aiAtsReviewSchema = z.object({
-  overallScore: z.number().int().min(0).max(100),
-  atsReadinessScore: z.number().int().min(0).max(100),
-  recruiterReadabilityScore: z.number().int().min(0).max(100),
+  overallScore: scoreSchema,
+  atsReadinessScore: scoreSchema,
+  recruiterReadabilityScore: scoreSchema,
   executiveSummary: z.string(),
-  strengths: z.array(z.string()).min(2).max(6),
-  risks: z.array(z.string()).min(2).max(6),
-  priorityActions: z.array(aiPriorityActionSchema).min(3).max(6),
-  sectionFeedback: z.array(aiSectionFeedbackSchema).min(3).max(6),
+  strengths: z.array(z.string()).min(1).max(6),
+  risks: z.array(z.string()).min(1).max(6),
+  priorityActions: z.array(aiPriorityActionSchema).min(1).max(6),
+  sectionFeedback: z.array(aiSectionFeedbackSchema).min(1).max(6),
   rewrittenSummary: z.string(),
   skillsToAdd: z.array(z.string()).max(12),
 })
@@ -39,16 +41,16 @@ export const aiExperienceRewriteSchema = z.object({
 export const aiJobTailorSchema = z.object({
   targetRole: z.string(),
   company: z.string(),
-  matchScore: z.number().int().min(0).max(100),
-  atsFitScore: z.number().int().min(0).max(100),
+  matchScore: scoreSchema,
+  atsFitScore: scoreSchema,
   executiveSummary: z.string(),
-  matchedStrengths: z.array(z.string()).min(2).max(6),
+  matchedStrengths: z.array(z.string()).min(1).max(6),
   missingKeywords: z.array(z.string()).max(15),
-  recruiterConcerns: z.array(z.string()).min(2).max(6),
+  recruiterConcerns: z.array(z.string()).min(1).max(6),
   tailoredSummary: z.string(),
   skillsToAdd: z.array(z.string()).max(12),
   experienceRewrites: z.array(aiExperienceRewriteSchema).max(4),
-  interviewTalkingPoints: z.array(z.string()).min(3).max(6),
+  interviewTalkingPoints: z.array(z.string()).min(1).max(6),
   versionNote: z.string(),
 })
 
