@@ -50,7 +50,6 @@ import { SectionSkills } from '@/components/cv-editor/section-skills'
 import { SectionProjects } from '@/components/cv-editor/section-projects'
 import { SectionCertifications } from '@/components/cv-editor/section-certifications'
 import { SectionLanguages } from '@/components/cv-editor/section-languages'
-import { CVPreview } from '@/components/cv-editor/cv-preview'
 import { ATSPanel } from '@/components/cv-editor/ats-panel'
 import { JDMatchPanel } from '@/components/cv-editor/jd-match-panel'
 import { AIAssistantPanel } from '@/components/cv-editor/ai-assistant-panel'
@@ -134,7 +133,11 @@ export default function CVEditorPage() {
   const [versionNote, setVersionNote] = useState('')
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
   const [lastVersionSavedLabel, setLastVersionSavedLabel] = useState<string | null>(null)
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null)
+  const [isPdfPreviewLoading, setIsPdfPreviewLoading] = useState(false)
+  const [pdfPreviewError, setPdfPreviewError] = useState<string | null>(null)
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const pdfPreviewUrlRef = useRef<string | null>(null)
   
   // Load CV data from database
   useEffect(() => {
@@ -181,6 +184,66 @@ export default function CVEditorPage() {
       setLatexCode(latex)
     }
   }, [cvData, cv])
+
+  useEffect(() => {
+    return () => {
+      if (pdfPreviewUrlRef.current) {
+        URL.revokeObjectURL(pdfPreviewUrlRef.current)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (rightPanel !== 'preview' || !cvData || !cv) return
+
+    const controller = new AbortController()
+    const timeout = window.setTimeout(async () => {
+      setIsPdfPreviewLoading(true)
+      setPdfPreviewError(null)
+
+      try {
+        const response = await fetch('/api/pdf', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          cache: 'no-store',
+          signal: controller.signal,
+          body: JSON.stringify({
+            cvData,
+            templateId: cv.template_id,
+            title: cv.title,
+            format: 'pdf',
+          }),
+        })
+
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({}))
+          throw new Error(error.message || 'Failed to compile LaTeX PDF preview')
+        }
+
+        const blob = await response.blob()
+        const nextUrl = URL.createObjectURL(blob)
+
+        if (pdfPreviewUrlRef.current) {
+          URL.revokeObjectURL(pdfPreviewUrlRef.current)
+        }
+
+        pdfPreviewUrlRef.current = nextUrl
+        setPdfPreviewUrl(nextUrl)
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') return
+        setPdfPreviewError(error instanceof Error ? error.message : 'Failed to compile LaTeX PDF preview')
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsPdfPreviewLoading(false)
+        }
+      }
+    }, 1200)
+
+    return () => {
+      window.clearTimeout(timeout)
+      controller.abort()
+    }
+  }, [rightPanel, cvData, cv])
   
   // Auto-save with debounce
   useEffect(() => {
@@ -477,10 +540,6 @@ export default function CVEditorPage() {
         throw new Error(error.message || 'Failed to generate PDF')
       }
 
-      const renderer = response.headers.get('x-cv-pdf-renderer')
-      const renderedTemplate = response.headers.get('x-cv-pdf-template')
-      const usedFallback = renderer === 'fallback'
-      
       const blob = await response.blob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -492,14 +551,7 @@ export default function CVEditorPage() {
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
 
-      if (usedFallback) {
-        toast({
-          title: 'PDF downloaded (compatibility mode)',
-          description: `LaTeX engine unavailable on server. Applied simplified ${renderedTemplate || cv?.template_id || 'template'} styling.`,
-        })
-      } else {
-        toast({ title: 'PDF downloaded' })
-      }
+      toast({ title: 'PDF downloaded from LaTeX' })
     } catch (error) {
       toast({ 
         title: error instanceof Error ? error.message : 'Failed to generate PDF', 
@@ -699,7 +751,7 @@ export default function CVEditorPage() {
               <TabsList className="h-8">
                 <TabsTrigger value="preview" className="text-xs h-7">
                   <Eye className="h-3 w-3 mr-1" />
-                  Preview
+                  LaTeX PDF
                 </TabsTrigger>
                 <TabsTrigger value="ats" className="text-xs h-7">
                   <Shield className="h-3 w-3 mr-1" />
@@ -719,11 +771,40 @@ export default function CVEditorPage() {
           
           <div className="flex-1 p-4 overflow-hidden">
             {rightPanel === 'preview' && (
-              <CVPreview 
-                data={cvData} 
-                templateId={cv.template_id}
-                className="h-full"
-              />
+              <div className="flex h-full flex-col overflow-hidden rounded-lg border bg-muted/20">
+                <div className="flex items-center justify-between border-b bg-background px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">Compiled LaTeX PDF</p>
+                    <p className="truncate text-xs text-muted-foreground">Renderer: LaTeX</p>
+                  </div>
+                  {isPdfPreviewLoading && (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Compiling
+                    </div>
+                  )}
+                </div>
+
+                {pdfPreviewError ? (
+                  <div className="m-4 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+                    <p className="font-medium">LaTeX compilation failed</p>
+                    <p className="mt-2 whitespace-pre-wrap text-xs">{pdfPreviewError}</p>
+                  </div>
+                ) : pdfPreviewUrl ? (
+                  <iframe
+                    src={pdfPreviewUrl}
+                    title="Compiled LaTeX PDF preview"
+                    className="h-full w-full flex-1 bg-white"
+                  />
+                ) : (
+                  <div className="flex h-full flex-1 items-center justify-center text-sm text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Compiling LaTeX preview...
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
             {rightPanel === 'ats' && (
               <ATSPanel data={cvData} />

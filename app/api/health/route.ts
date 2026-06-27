@@ -36,7 +36,7 @@ async function checkCommand(command: string): Promise<{ command: string; availab
 export async function GET() {
   const requestedCommands = process.env.LATEX_CMD
     ? [process.env.LATEX_CMD]
-    : ['xelatex', 'pdflatex']
+    : ['pdflatex', 'xelatex']
   const latexCommands = await Promise.all(requestedCommands.map(checkCommand))
   const latexAvailable = latexCommands.some((item) => item.available)
 
@@ -47,7 +47,7 @@ export async function GET() {
     latex: {
       available: latexAvailable,
       commands: latexCommands,
-      mode: latexAvailable ? 'latex' : 'pdf-lib-fallback',
+      mode: latexAvailable ? 'latex' : 'unavailable',
     },
   })
 }

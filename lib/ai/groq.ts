@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import { resolveAppBaseUrl } from '@/lib/app-url'
 
 type ChatMessage = {
   role: 'system' | 'user' | 'assistant'
@@ -9,7 +8,7 @@ type ChatMessage = {
 type ChatCompletionResponse = {
   choices?: Array<{
     message?: {
-      content?: string | Array<{ type?: string; text?: string }>
+      content?: string
     }
   }>
   error?: {
@@ -17,56 +16,35 @@ type ChatCompletionResponse = {
   }
 }
 
-type MessageContent = string | Array<{ type?: string; text?: string }> | undefined
-
-function getOpenRouterModel() {
-  return process.env.OPENROUTER_MODEL || 'nvidia/nemotron-3-super-120b-a12b:free'
+function getGroqModel() {
+  return process.env.GROQ_MODEL || 'llama-3.3-70b-versatile'
 }
 
-function getOpenRouterTimeoutMs() {
-  const configuredTimeout = Number(process.env.OPENROUTER_TIMEOUT_MS)
-  return Number.isFinite(configuredTimeout) && configuredTimeout > 0 ? configuredTimeout : 5500
+function getGroqTimeoutMs() {
+  const configuredTimeout = Number(process.env.GROQ_TIMEOUT_MS)
+  return Number.isFinite(configuredTimeout) && configuredTimeout > 0 ? configuredTimeout : 45000
 }
 
-function getOpenRouterHeaders() {
-  const apiKey = process.env.OPENROUTER_API_KEY
+function getGroqHeaders() {
+  const apiKey = process.env.GROQ_API_KEY
 
   if (!apiKey) {
-    throw new Error('OPENROUTER_API_KEY is missing. Add it to .env.local to enable AI features.')
+    throw new Error('GROQ_API_KEY is missing. Add it to .env.local to enable AI features.')
   }
-
-  const appUrl = resolveAppBaseUrl()
 
   return {
     Authorization: `Bearer ${apiKey}`,
     'Content-Type': 'application/json',
-    'HTTP-Referer': appUrl,
-    'X-Title': 'CV Builder',
   }
-}
-
-function getMessageText(content: MessageContent) {
-  if (typeof content === 'string') {
-    return content
-  }
-
-  if (Array.isArray(content)) {
-    return content
-      .map((part) => (typeof part?.text === 'string' ? part.text : ''))
-      .join('')
-      .trim()
-  }
-
-  return ''
 }
 
 async function postCompletion(body: Record<string, unknown>) {
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), getOpenRouterTimeoutMs())
+  const timeout = setTimeout(() => controller.abort(), getGroqTimeoutMs())
 
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
-    headers: getOpenRouterHeaders(),
+    headers: getGroqHeaders(),
     body: JSON.stringify(body),
     cache: 'no-store',
     signal: controller.signal,
@@ -75,13 +53,13 @@ async function postCompletion(body: Record<string, unknown>) {
   const payload = (await response.json().catch(() => ({}))) as ChatCompletionResponse
 
   if (!response.ok) {
-    throw new Error(payload?.error?.message || `OpenRouter request failed with status ${response.status}`)
+    throw new Error(payload?.error?.message || `Groq request failed with status ${response.status}`)
   }
 
-  const content = getMessageText(payload?.choices?.[0]?.message?.content)
+  const content = payload?.choices?.[0]?.message?.content?.trim()
 
   if (!content) {
-    throw new Error('OpenRouter returned an empty response.')
+    throw new Error('Groq returned an empty response.')
   }
 
   return content
@@ -91,6 +69,14 @@ function formatZodIssues(error: z.ZodError) {
   return error.issues
     .map((issue) => `${issue.path.join('.') || 'root'}: ${issue.message}`)
     .join('; ')
+}
+
+function parseJsonObject(content: string) {
+  try {
+    return JSON.parse(content)
+  } catch {
+    throw new Error('Groq returned invalid JSON.')
+  }
 }
 
 export async function generateStructuredObject<T extends z.ZodTypeAny>({
@@ -108,13 +94,13 @@ export async function generateStructuredObject<T extends z.ZodTypeAny>({
   maxCompletionTokens?: number
   user?: string
 }): Promise<z.infer<T>> {
-  const model = getOpenRouterModel()
+  const model = getGroqModel()
   const requestMessages: ChatMessage[] = [
     ...messages,
     {
       role: 'user',
       content: [
-        'Return only a valid JSON object without markdown.',
+        'Return only one valid JSON object. Do not include markdown, commentary, or surrounding text.',
         'Follow this exact response shape and field intent:',
         shapeInstructions,
       ].join('\n'),
@@ -128,14 +114,12 @@ export async function generateStructuredObject<T extends z.ZodTypeAny>({
       temperature,
       max_completion_tokens: maxCompletionTokens,
       user,
-      plugins: [{ id: 'response-healing' }],
       response_format: {
         type: 'json_object',
       },
     })
 
-    const parsed = JSON.parse(content)
-    return schema.parse(parsed)
+    return schema.parse(parseJsonObject(content))
   } catch (error) {
     if (error instanceof z.ZodError) {
       const repairContent = await postCompletion({
@@ -158,15 +142,14 @@ export async function generateStructuredObject<T extends z.ZodTypeAny>({
         temperature: 0.1,
         max_completion_tokens: maxCompletionTokens,
         user,
-        plugins: [{ id: 'response-healing' }],
         response_format: {
           type: 'json_object',
         },
       })
 
-      return schema.parse(JSON.parse(repairContent))
+      return schema.parse(parseJsonObject(repairContent))
     }
 
-    throw error instanceof Error ? error : new Error('Failed to parse OpenRouter JSON response.')
+    throw error instanceof Error ? error : new Error('Failed to parse Groq JSON response.')
   }
 }

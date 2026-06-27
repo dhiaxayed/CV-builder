@@ -837,7 +837,7 @@ ${bullets}
 
 \\usepackage[utf8]{inputenc}
 \\usepackage[T1]{fontenc}
-\\usepackage{libertine}
+\\usepackage{lmodern}
 \\usepackage[margin=1in]{geometry}
 \\usepackage{enumitem}
 \\usepackage[hidelinks]{hyperref}
@@ -1064,7 +1064,7 @@ ${bullets}
 
 % Section styling
 \\titleformat{\\section}
-  {\\color{navy}\\Large\\bfseries\\scshape}{}{0em}{}[\\color{gold}\\titlerule[1pt]]
+  {\\color{navy}\\Large\\bfseries\\scshape}{}{0em}{}[\\vspace{2pt}{\\color{gold}\\titlerule[1pt]}]
 \\titlespacing*{\\section}{0pt}{16pt}{10pt}
 
 % Custom commands
@@ -1126,9 +1126,9 @@ export function generateCasualTemplate(data: CVData): string {
       : `${formatDate(exp.startDate)} -- ${formatDate(exp.endDate)}`
     const bullets = safeArray(exp.bullets).filter(b => b.trim()).map(b => `\\item ${escapeLatex(b)}`).join('\n')
     const tech = exp.technologies?.length 
-      ? `\\\\\\textit{Technologies: ${escapeLatex(exp.technologies.join(', '))}}`
+      ? `\\textit{Technologies: ${escapeLatex(exp.technologies.join(', '))}}`
       : ''
-    return `\\cventry{${dateRange}}{${escapeLatex(exp.role)}}{${escapeLatex(exp.company)}}{${escapeLatex(exp.location)}}{}{}${tech}
+    return `\\cventry{${dateRange}}{${escapeLatex(exp.role)}}{${escapeLatex(exp.company)}}{${escapeLatex(exp.location)}}{}{${tech}}
 \\begin{itemize}
 ${bullets}
 \\end{itemize}`
@@ -1162,6 +1162,7 @@ ${bullets}
 
 \\usepackage[utf8]{inputenc}
 \\usepackage[scale=0.85]{geometry}
+\\microtypesetup{expansion=false}
 
 % Personal information
 \\name{${escapeLatex(basics.name.split(' ')[0] || '')}}{${escapeLatex(basics.name.split(' ').slice(1).join(' ') || '')}}
@@ -1237,6 +1238,7 @@ ${bullets}
 
 \\usepackage[utf8]{inputenc}
 \\usepackage[scale=0.85]{geometry}
+\\microtypesetup{expansion=false}
 
 % Personal information
 \\name{${escapeLatex(basics.name.split(' ')[0] || '')}}{${escapeLatex(basics.name.split(' ').slice(1).join(' ') || '')}}
@@ -1365,9 +1367,9 @@ export function generateFancyTemplate(data: CVData): string {
       : `${formatDate(exp.startDate)} -- ${formatDate(exp.endDate)}`
     const bullets = safeArray(exp.bullets).filter(b => b.trim()).map(b => `\\item ${escapeLatex(b)}`).join('\n')
     const tech = exp.technologies?.length 
-      ? `\\\\\\small\\textit{Stack: ${escapeLatex(exp.technologies.join(' | '))}}`
+      ? `\\small\\textit{Stack: ${escapeLatex(exp.technologies.join(' | '))}}`
       : ''
-    return `\\cventry{${dateRange}}{${escapeLatex(exp.role)}}{${escapeLatex(exp.company)}}{${escapeLatex(exp.location)}}{}{}${tech}
+    return `\\cventry{${dateRange}}{${escapeLatex(exp.role)}}{${escapeLatex(exp.company)}}{${escapeLatex(exp.location)}}{}{${tech}}
 \\begin{itemize}
 ${bullets}
 \\end{itemize}`
@@ -1391,6 +1393,7 @@ ${bullets}
 
 \\usepackage[utf8]{inputenc}
 \\usepackage[scale=0.85]{geometry}
+\\microtypesetup{expansion=false}
 
 % Personal information
 \\name{${escapeLatex(basics.name.split(' ')[0] || '')}}{${escapeLatex(basics.name.split(' ').slice(1).join(' ') || '')}}
@@ -1497,7 +1500,7 @@ ${bullets}
 
 % Section styling
 \\titleformat{\\section}
-  {\\color{sidebar}\\large\\bfseries\\uppercase}{}{0em}{}[\\color{accent}\\titlerule]
+  {\\color{sidebar}\\large\\bfseries}{}{0em}{}[\\color{accent}\\titlerule]
 \\titlespacing*{\\section}{0pt}{14pt}{8pt}
 
 % Custom commands
@@ -1612,7 +1615,6 @@ export function generateCompactTemplate(data: CVData): string {
 \\usepackage{enumitem}
 \\usepackage[hidelinks]{hyperref}
 \\usepackage{titlesec}
-\\usepackage{mdwlist}
 
 \\pagestyle{empty}
 
@@ -1700,6 +1702,7 @@ ${escapeLatex(edu.institution)}, ${escapeLatex(edu.location)} \\hfill ${formatDa
 \\usepackage{xcolor}
 \\usepackage{titlesec}
 \\usepackage{tikz}
+\\usepackage{amssymb}
 
 \\definecolor{black}{RGB}{0,0,0}
 \\definecolor{gray}{RGB}{100,100,100}
@@ -2045,47 +2048,287 @@ export const AVAILABLE_TEMPLATES = [
   },
 ]
 
+type StructuredTemplateTheme = {
+  label: string
+  accent: string
+  muted: string
+  margin: string
+  sectionRule: boolean
+  compact: boolean
+  headerStyle: 'centered' | 'left' | 'band'
+}
+
+const STRUCTURED_TEMPLATE_THEMES: Record<string, StructuredTemplateTheme> = {
+  modern: { label: 'Modern', accent: '2563EB', muted: '4B5563', margin: '0.62in', sectionRule: true, compact: false, headerStyle: 'centered' },
+  'modern-ats': { label: 'Modern', accent: '2563EB', muted: '4B5563', margin: '0.62in', sectionRule: true, compact: false, headerStyle: 'centered' },
+  classic: { label: 'Classic', accent: '111827', muted: '4B5563', margin: '0.7in', sectionRule: true, compact: false, headerStyle: 'left' },
+  'classic-ats': { label: 'Classic', accent: '111827', muted: '4B5563', margin: '0.7in', sectionRule: true, compact: false, headerStyle: 'left' },
+  minimal: { label: 'Minimal', accent: '374151', muted: '6B7280', margin: '0.72in', sectionRule: false, compact: false, headerStyle: 'centered' },
+  'minimal-ats': { label: 'Minimal', accent: '374151', muted: '6B7280', margin: '0.72in', sectionRule: false, compact: false, headerStyle: 'centered' },
+  compact: { label: 'Compact', accent: '1D4ED8', muted: '4B5563', margin: '0.48in', sectionRule: true, compact: true, headerStyle: 'left' },
+  professional: { label: 'Professional', accent: '1E3A8A', muted: '475569', margin: '0.68in', sectionRule: true, compact: false, headerStyle: 'centered' },
+  executive: { label: 'Executive', accent: '92400E', muted: '475569', margin: '0.72in', sectionRule: true, compact: false, headerStyle: 'centered' },
+  banking: { label: 'Banking', accent: '0F172A', muted: '475569', margin: '0.68in', sectionRule: true, compact: false, headerStyle: 'left' },
+  elegant: { label: 'Elegant', accent: '0F766E', muted: '57534E', margin: '0.7in', sectionRule: true, compact: false, headerStyle: 'left' },
+  creative: { label: 'Creative', accent: '0284C7', muted: '475569', margin: '0.65in', sectionRule: true, compact: false, headerStyle: 'band' },
+  fancy: { label: 'Fancy', accent: 'A21CAF', muted: '4B5563', margin: '0.65in', sectionRule: true, compact: false, headerStyle: 'band' },
+  bold: { label: 'Bold', accent: 'DC2626', muted: '374151', margin: '0.62in', sectionRule: true, compact: false, headerStyle: 'band' },
+  infographic: { label: 'Infographic', accent: 'EA580C', muted: '475569', margin: '0.6in', sectionRule: true, compact: false, headerStyle: 'band' },
+  tech: { label: 'Tech', accent: '047857', muted: '475569', margin: '0.62in', sectionRule: true, compact: false, headerStyle: 'left' },
+  academic: { label: 'Academic', accent: '4338CA', muted: '4B5563', margin: '0.76in', sectionRule: true, compact: false, headerStyle: 'left' },
+  casual: { label: 'Casual', accent: '0891B2', muted: '4B5563', margin: '0.68in', sectionRule: false, compact: false, headerStyle: 'centered' },
+  vintage: { label: 'Vintage', accent: '92400E', muted: '57534E', margin: '0.72in', sectionRule: true, compact: false, headerStyle: 'centered' },
+}
+
+function getStructuredTheme(templateId: string): StructuredTemplateTheme {
+  return STRUCTURED_TEMPLATE_THEMES[templateId] || STRUCTURED_TEMPLATE_THEMES.modern
+}
+
+function latexBullets(items: string[]): string {
+  const bullets = items.filter((item) => item.trim()).map((item) => `  \\item ${escapeLatex(item)}`).join('\n')
+  return bullets ? `\\begin{itemize}\n${bullets}\n\\end{itemize}` : ''
+}
+
+function latexSection(title: string, content: string): string {
+  return content.trim() ? `\\section*{${escapeLatex(title)}}\n${content}` : ''
+}
+
+function latexInlineList(items: string[], separator = ' \\textbullet{} '): string {
+  return items.filter((item) => item.trim()).map(escapeLatex).join(separator)
+}
+
+function latexEntry({
+  title,
+  right,
+  subtitle,
+  meta,
+  body,
+}: {
+  title: string
+  right?: string
+  subtitle?: string
+  meta?: string
+  body?: string
+}): string {
+  const safeRight = right ? escapeLatex(right) : ''
+  const safeSubtitle = subtitle ? escapeLatex(subtitle) : ''
+  const safeMeta = meta ? escapeLatex(meta) : ''
+
+  return `\\cventry{${escapeLatex(title)}}{${safeRight}}{${safeSubtitle}}{${safeMeta}}{${body || ''}}`
+}
+
+function generateStructuredLatexTemplate(data: CVData, templateId: string): string {
+  const theme = getStructuredTheme(templateId)
+  const { basics, summary } = data
+  const fontSize = theme.compact ? '10pt' : '11pt'
+  const sectionAfter = theme.sectionRule ? '[\\color{accent}\\titlerule]' : ''
+  const itemSep = theme.compact ? '1pt' : '2pt'
+  const sectionSpacing = theme.compact ? '8pt' : '11pt'
+  const headerContact = [
+    basics.contact.email,
+    basics.contact.phone,
+    basics.contact.location,
+    basics.contact.linkedin,
+    basics.contact.github,
+    basics.contact.website,
+  ].filter((item): item is string => Boolean(item))
+
+  const header =
+    theme.headerStyle === 'band'
+      ? `\\colorbox{accent!10}{\\parbox{\\dimexpr\\textwidth-2\\fboxsep\\relax}{\\centering
+{\\fontsize{22pt}{25pt}\\selectfont\\bfseries\\color{accent}${escapeLatex(basics.name || 'Your Name')}}\\\\[3pt]
+{\\large ${escapeLatex(basics.title || 'Curriculum Vitae')}}\\\\[5pt]
+{\\small ${latexInlineList(headerContact, ' \\textbar{} ')}}
+}}`
+      : theme.headerStyle === 'left'
+        ? `\\noindent{\\fontsize{22pt}{25pt}\\selectfont\\bfseries\\color{accent}${escapeLatex(basics.name || 'Your Name')}}\\\\[3pt]
+{\\large ${escapeLatex(basics.title || 'Curriculum Vitae')}}\\\\[5pt]
+{\\small\\color{muted}${latexInlineList(headerContact, ' \\textbar{} ')}}`
+        : `\\begin{center}
+{\\fontsize{22pt}{25pt}\\selectfont\\bfseries\\color{accent}${escapeLatex(basics.name || 'Your Name')}}\\\\[3pt]
+{\\large ${escapeLatex(basics.title || 'Curriculum Vitae')}}\\\\[5pt]
+{\\small\\color{muted}${latexInlineList(headerContact, ' \\textbar{} ')}}
+\\end{center}`
+
+  const experience = data.experience
+    .map((exp) => {
+      const dateRange = exp.current
+        ? `${formatDate(exp.startDate)} -- Present`
+        : `${formatDate(exp.startDate)} -- ${formatDate(exp.endDate)}`
+      const organization = [exp.company, exp.location].filter(Boolean).join(', ')
+      const tech = safeArray(exp.technologies).length
+        ? `\\smallskip\\par{\\small\\textit{Technologies: ${latexInlineList(safeArray(exp.technologies), ', ')}}}`
+        : ''
+      return latexEntry({
+        title: exp.role,
+        right: dateRange,
+        subtitle: organization,
+        body: `${tech}\n${latexBullets(safeArray(exp.bullets))}`,
+      })
+    })
+    .join('\n')
+
+  const education = data.education
+    .map((edu) => {
+      const dateRange = `${formatDate(edu.startDate)} -- ${formatDate(edu.endDate)}`
+      const degree = `${edu.degree} in ${edu.field}${edu.gpa ? ` | GPA: ${edu.gpa}` : ''}`
+      const highlights = safeArray(edu.highlights).length
+        ? `\\smallskip\\par{\\small ${latexInlineList(safeArray(edu.highlights), '; ')}}`
+        : ''
+      return latexEntry({
+        title: edu.institution,
+        right: dateRange,
+        subtitle: degree,
+        meta: edu.location,
+        body: highlights,
+      })
+    })
+    .join('\n')
+
+  const skills = data.skills
+    .map((group) => `\\skillrow{${escapeLatex(group.category)}}{${latexInlineList(safeArray(group.skills), ', ')}}`)
+    .join('\n')
+
+  const projects = data.projects
+    .map((project) => {
+      const dateRange = [formatDate(project.startDate || ''), formatDate(project.endDate || '')].filter(Boolean).join(' -- ')
+      const tech = safeArray(project.technologies).length
+        ? `\\smallskip\\par{\\small\\textit{Technologies: ${latexInlineList(safeArray(project.technologies), ', ')}}}`
+        : ''
+      const description = project.description ? `${escapeLatex(project.description)}\\par` : ''
+      const url = project.url ? `\\smallskip\\par{\\small ${escapeLatex(project.url)}}` : ''
+      return latexEntry({
+        title: project.name,
+        right: dateRange,
+        body: `${description}${tech}${url}\n${latexBullets(safeArray(project.bullets))}`,
+      })
+    })
+    .join('\n')
+
+  const certifications = data.certifications
+    .map((cert) => {
+      const dates = [formatDate(cert.date), cert.expirationDate ? `Valid until ${formatDate(cert.expirationDate)}` : '']
+        .filter(Boolean)
+        .join(' | ')
+      return latexEntry({
+        title: cert.name,
+        right: dates,
+        subtitle: cert.issuer,
+      })
+    })
+    .join('\n')
+
+  const awards = data.awards
+    .map((award) =>
+      latexEntry({
+        title: award.title,
+        right: award.date,
+        subtitle: award.issuer,
+        body: award.description ? escapeLatex(award.description) : '',
+      })
+    )
+    .join('\n')
+
+  const languages = data.languages
+    .map((language) => `${escapeLatex(language.language)} (${escapeLatex(language.proficiency)})`)
+    .join(' \\textbar{} ')
+
+  const customSections = safeArray(data.customSections)
+    .map((section) => {
+      const content =
+        section.type === 'bullets'
+          ? latexBullets(safeArray(section.content))
+          : safeArray(section.content).map((item) => `${escapeLatex(item)}\\par`).join('\n')
+      return latexSection(section.title, content)
+    })
+    .join('\n\n')
+
+  return `%-------------------------
+% ${theme.label} CV Template
+% Structured LaTeX renderer
+%-------------------------
+
+\\documentclass[${fontSize},a4paper]{article}
+
+\\usepackage[utf8]{inputenc}
+\\usepackage[T1]{fontenc}
+\\usepackage{lmodern}
+\\usepackage[margin=${theme.margin}]{geometry}
+\\usepackage[hidelinks]{hyperref}
+\\usepackage{xcolor}
+\\usepackage{titlesec}
+\\usepackage{enumitem}
+\\usepackage{tabularx}
+\\usepackage{needspace}
+\\usepackage{ragged2e}
+
+\\definecolor{accent}{HTML}{${theme.accent}}
+\\definecolor{muted}{HTML}{${theme.muted}}
+
+\\pagestyle{empty}
+\\setlength{\\parindent}{0pt}
+\\setlength{\\parskip}{3pt}
+\\setlength{\\tabcolsep}{0pt}
+\\sloppy
+\\emergencystretch=2em
+\\RaggedRight
+
+\\titleformat{\\section}{\\color{accent}\\large\\bfseries\\scshape}{}{0em}{}${sectionAfter}
+\\titlespacing*{\\section}{0pt}{${sectionSpacing}}{5pt}
+
+\\setlist[itemize]{
+  leftmargin=1.25em,
+  topsep=2pt,
+  itemsep=${itemSep},
+  parsep=0pt,
+  partopsep=0pt
+}
+
+\\newcommand{\\cventry}[5]{%
+  \\Needspace{5\\baselineskip}
+  \\begin{tabularx}{\\textwidth}{@{}>{\\raggedright\\arraybackslash}X r@{}}
+    \\textbf{#1} & {\\small\\color{muted}#2}\\\\
+    {\\small\\color{muted}#3} & {\\small\\color{muted}#4}\\\\
+  \\end{tabularx}
+  #5\\par\\vspace{4pt}
+}
+
+\\newcommand{\\skillrow}[2]{%
+  \\Needspace{2\\baselineskip}
+  \\textbf{#1:} #2\\par
+}
+
+\\begin{document}
+
+${header}
+
+\\vspace{8pt}
+
+${latexSection('Summary', summary ? escapeLatex(summary) : '')}
+
+${latexSection('Experience', experience)}
+
+${latexSection('Education', education)}
+
+${latexSection('Skills', skills)}
+
+${latexSection('Projects', projects)}
+
+${latexSection('Certifications', certifications)}
+
+${latexSection('Awards & Honors', awards)}
+
+${latexSection('Languages', languages)}
+
+${customSections}
+
+\\end{document}
+`
+}
+
 // ============================================================================
 // Main Generator Function
 // ============================================================================
 export function generateLatex(data: CVData, templateId: string): string {
-  switch (templateId) {
-    case 'modern':
-    case 'modern-ats':
-      return generateModernTemplate(data)
-    case 'classic':
-    case 'classic-ats':
-      return generateClassicTemplate(data)
-    case 'minimal':
-    case 'minimal-ats':
-      return generateMinimalTemplate(data)
-    case 'professional':
-      return generateProfessionalTemplate(data)
-    case 'creative':
-      return generateCreativeTemplate(data)
-    case 'academic':
-      return generateAcademicTemplate(data)
-    case 'tech':
-      return generateTechTemplate(data)
-    case 'executive':
-      return generateExecutiveTemplate(data)
-    case 'casual':
-      return generateCasualTemplate(data)
-    case 'banking':
-      return generateBankingTemplate(data)
-    case 'vintage':
-      return generateVintageTemplate(data)
-    case 'fancy':
-      return generateFancyTemplate(data)
-    case 'elegant':
-      return generateElegantTemplate(data)
-    case 'compact':
-      return generateCompactTemplate(data)
-    case 'bold':
-      return generateBoldTemplate(data)
-    case 'infographic':
-      return generateInfographicTemplate(data)
-    default:
-      return generateModernTemplate(data)
-  }
+  return generateStructuredLatexTemplate(data, templateId)
 }

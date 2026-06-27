@@ -43,12 +43,12 @@ interface AIAssistantPanelProps {
 type ReviewResponse = {
   review: AIAtsReview
   heuristicReport: ATSReport
-  source: 'openrouter' | 'heuristic-fallback'
+  source: 'groq' | 'heuristic-fallback'
 }
 
 type TailorResponse = {
   analysis: AIJobTailorAnalysis
-  source: 'openrouter' | 'heuristic-fallback'
+  source: 'groq' | 'heuristic-fallback'
   savedJobDescriptionId?: string | null
   heuristicMatch: {
     extractedKeywords: string[]
@@ -65,6 +65,22 @@ type JobDescriptionHistoryItem = {
   company: string | null
   match_score: number | null
   created_at: string
+}
+
+async function readApiResponse<T>(response: Response): Promise<T & { error?: string; code?: string }> {
+  const body = await response.text()
+
+  if (!body.trim()) {
+    return {} as T & { error?: string; code?: string }
+  }
+
+  try {
+    return JSON.parse(body) as T & { error?: string; code?: string }
+  } catch {
+    return {
+      error: response.ok ? 'The server returned an invalid response.' : body,
+    } as T & { error?: string; code?: string }
+  }
 }
 
 export function AIAssistantPanel({
@@ -98,7 +114,7 @@ export function AIAssistantPanel({
     const response = await fetch('/api/ai/job-descriptions')
     if (!response.ok) return
 
-    const payload = (await response.json()) as { jobDescriptions?: JobDescriptionHistoryItem[] }
+    const payload = await readApiResponse<{ jobDescriptions?: JobDescriptionHistoryItem[] }>(response)
     setJobHistory(payload.jobDescriptions || [])
   }
 
@@ -124,7 +140,7 @@ export function AIAssistantPanel({
         body: JSON.stringify({ cvId, cvData: data }),
       })
 
-      const payload = (await response.json()) as ReviewResponse & { error?: string }
+      const payload = await readApiResponse<ReviewResponse>(response)
 
       if (!response.ok) {
         throw new Error(payload.error || 'Failed to generate AI ATS review')
@@ -179,7 +195,7 @@ export function AIAssistantPanel({
         }),
       })
 
-      const payload = (await response.json()) as TailorResponse & { error?: string; code?: string }
+      const payload = await readApiResponse<TailorResponse>(response)
 
       if (!response.ok) {
         const message =
@@ -266,7 +282,7 @@ export function AIAssistantPanel({
               <div className="space-y-3 rounded-lg border p-3">
                 {reviewData.source === 'heuristic-fallback' && (
                   <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-                    OpenRouter was unavailable, so this review used the local ATS heuristic engine.
+                    Groq was unavailable, so this review used the local ATS heuristic engine.
                   </div>
                 )}
                 <div className="grid grid-cols-3 gap-2 text-center">
@@ -471,7 +487,7 @@ export function AIAssistantPanel({
               <div className="space-y-3 rounded-lg border p-3">
                 {tailorData.source === 'heuristic-fallback' && (
                   <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-                    OpenRouter was unavailable, so this tailoring package used local keyword and ATS heuristics.
+                    Groq was unavailable, so this tailoring package used local keyword and ATS heuristics.
                   </div>
                 )}
                 <div className="grid grid-cols-3 gap-2 text-center">

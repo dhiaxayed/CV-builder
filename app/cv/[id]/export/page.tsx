@@ -92,10 +92,6 @@ export default function ExportPage() {
         throw new Error(error.message || 'Failed to generate file')
       }
 
-      const renderer = response.headers.get('x-cv-pdf-renderer')
-      const renderedTemplate = response.headers.get('x-cv-pdf-template')
-      const usedFallback = format === 'pdf' && renderer === 'fallback'
-      
       const blob = await response.blob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -109,14 +105,7 @@ export default function ExportPage() {
       URL.revokeObjectURL(url)
       
       const label = format === 'pdf' ? 'PDF' : format === 'latex' ? 'LaTeX' : 'JSON'
-      if (usedFallback) {
-        toast({
-          title: `${label} downloaded (compatibility mode)`,
-          description: `LaTeX engine unavailable on server. Applied simplified ${renderedTemplate || cv.template_id} styling.`,
-        })
-      } else {
-        toast({ title: `${label} file downloaded` })
-      }
+      toast({ title: format === 'pdf' ? 'PDF downloaded from LaTeX' : `${label} file downloaded` })
     } catch (error) {
       toast({ 
         title: error instanceof Error ? error.message : 'Failed to download file', 
@@ -238,7 +227,7 @@ export default function ExportPage() {
                     <div>
                       <h4 className="font-medium">PDF Export (.pdf)</h4>
                       <p className="text-sm text-muted-foreground mt-1">
-                        Download a PDF from your selected template. If LaTeX is unavailable on the server, a compatibility style is generated.
+                        Download the PDF compiled from the generated LaTeX for your selected template.
                       </p>
                     </div>
                   </div>

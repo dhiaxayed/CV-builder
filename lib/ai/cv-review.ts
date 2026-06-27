@@ -1,6 +1,6 @@
 import { runATSChecks, matchJobDescription, extractKeywords } from '@/lib/ats/checker'
 import { CVData } from '@/lib/types/cv'
-import { generateStructuredObject } from './openrouter'
+import { generateStructuredObject } from './groq'
 import { aiAtsReviewSchema, aiJobTailorSchema } from './types'
 import type { AIAtsReview, AIJobTailorAnalysis } from './types'
 
@@ -235,13 +235,16 @@ export async function generateAtsReview({
         {
           role: 'system',
           content: [
-            'You are a senior resume strategist and ATS optimization expert.',
-            'Review the CV for ATS readiness and recruiter readability.',
+            'You are a senior AI career strategist, ATS optimization expert, and digital recruitment consultant.',
+            'Review the CV for ATS readiness, recruiter readability, role positioning, and practical market value.',
+            'Be specific, direct, and commercially useful. Avoid generic advice.',
+            'Prioritize changes that improve shortlisting probability, keyword coverage, evidence quality, and recruiter scan speed.',
             'Do not invent experience, metrics, tools, employers, education, or achievements that are not supported by the CV.',
             'You may rewrite phrasing to make the CV sharper and more ATS-friendly, but keep factual claims grounded in the provided CV.',
             'Scores must be realistic and strict, not flattering.',
             'The rewrittenSummary must stay concise, professional, and fact-based.',
             'skillsToAdd should contain only plausible keywords missing from the CV, not fabricated achievements.',
+            'Priority actions must be ranked by business impact and include the section to edit.',
           ].join(' '),
         },
         {
@@ -260,7 +263,7 @@ export async function generateAtsReview({
     })
     return {
       review,
-      source: 'openrouter' as const,
+      source: 'groq' as const,
     }
   } catch {
     return {
@@ -324,8 +327,10 @@ export async function generateJobTailorAnalysis({
           {
             role: 'system',
             content: [
-              'You are an elite resume strategist for competitive job seekers.',
-              'Tailor the CV to the job description while staying completely truthful.',
+              'You are an elite AI resume strategist for competitive digital hiring pipelines.',
+              'Tailor the CV to the job description while staying completely truthful and implementation-ready.',
+              'Think like an ATS parser, a recruiter doing a 20-second scan, and a hiring manager evaluating role fit.',
+              'Return concrete keyword gaps, positioning improvements, and safe rewrite suggestions that create measurable value.',
               'Never fabricate employers, responsibilities, metrics, certifications, dates, or technologies.',
               'If the CV lacks evidence for a requested skill, surface it as a gap or keyword to add only when plausible.',
               'Use only provided experience IDs in experienceRewrites.',
@@ -362,7 +367,7 @@ export async function generateJobTailorAnalysis({
           },
         ],
       }),
-      source: 'openrouter' as const,
+      source: 'groq' as const,
     }
   } catch {
     return {
