@@ -9,7 +9,7 @@ import { tmpdir } from 'os'
 import path from 'path'
 import { spawn } from 'child_process'
 import sharp from 'sharp'
-import { compile as compileWithTectonic } from 'node-latex-compiler'
+import { createCompiler } from 'node-latex-compiler'
 
 export const runtime = 'nodejs'
 export const maxDuration = 300
@@ -63,22 +63,59 @@ function isSpawnNotFound(error: unknown): boolean {
   )
 }
 
+function resolveTectonicPath(): string {
+  const compiler = createCompiler() as unknown as {
+    isAvailable: () => boolean
+    tectonicPath?: string | null
+  }
+
+  if (!compiler.isAvailable() || !compiler.tectonicPath) {
+    throw new LatexEngineNotFoundError(['tectonic'], 'Bundled Tectonic executable was not found.')
+  }
+
+  return compiler.tectonicPath
+}
+
 async function compileLatexWithTectonic(texPath: string, tempDir: string): Promise<Buffer> {
-  const result = await compileWithTectonic({
-    texFile: texPath,
-    outputDir: tempDir,
-    returnBuffer: true,
+  const tectonicPath = resolveTectonicPath()
+  const cacheDir = path.join(tmpdir(), 'tectonic-cache')
+  await fs.mkdir(cacheDir, { recursive: true })
+
+  const result = await new Promise<{ code: number | null; stdout: string; stderr: string }>((resolve, reject) => {
+    const child = spawn(tectonicPath, [texPath, `--outdir=${tempDir}`], {
+      cwd: tempDir,
+      env: {
+        ...process.env,
+        HOME: tmpdir(),
+        XDG_CACHE_HOME: process.env.XDG_CACHE_HOME || cacheDir,
+        TECTONIC_CACHE_DIR: process.env.TECTONIC_CACHE_DIR || cacheDir,
+      },
+    })
+
+    let stdout = ''
+    let stderr = ''
+
+    child.stdout.on('data', (data) => {
+      stdout += data.toString()
+    })
+
+    child.stderr.on('data', (data) => {
+      stderr += data.toString()
+    })
+
+    child.on('error', reject)
+    child.on('close', (code) => resolve({ code, stdout, stderr }))
   })
 
-  if (result.status === 'success' && result.pdfBuffer) {
-    return Buffer.from(result.pdfBuffer)
+  if (result.code === 0) {
+    const pdfPath = path.join(tempDir, `${path.basename(texPath, path.extname(texPath))}.pdf`)
+    return fs.readFile(pdfPath)
   }
 
   throw new LatexCompilationError(
-    result.error ||
-      result.stderr ||
+    result.stderr ||
       result.stdout ||
-      'Tectonic LaTeX compilation failed.'
+      `Tectonic LaTeX compilation failed with exit code ${result.code}.`
   )
 }
 

@@ -153,3 +153,27 @@ export async function generateStructuredObject<T extends z.ZodTypeAny>({
     throw error instanceof Error ? error : new Error('Failed to parse Groq JSON response.')
   }
 }
+
+const groqProbeSchema = z.object({
+  ok: z.boolean(),
+  provider: z.literal('groq'),
+})
+
+export async function probeGroq(): Promise<z.infer<typeof groqProbeSchema>> {
+  return generateStructuredObject({
+    schema: groqProbeSchema,
+    temperature: 0,
+    maxCompletionTokens: 50,
+    shapeInstructions: JSON.stringify({ ok: true, provider: 'groq' }),
+    messages: [
+      {
+        role: 'system',
+        content: 'You are a production health probe. Return the requested JSON exactly.',
+      },
+      {
+        role: 'user',
+        content: 'Confirm Groq chat completion availability.',
+      },
+    ],
+  })
+}
