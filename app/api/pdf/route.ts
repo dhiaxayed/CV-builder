@@ -14,6 +14,45 @@ export const runtime = 'nodejs'
 export const maxDuration = 60
 
 const MAX_PDF_PHOTO_BYTES = 5 * 1024 * 1024
+const DEFAULT_LATEX_COMMANDS = ['pdflatex', 'xelatex']
+
+class LatexEngineNotFoundError extends Error {
+  readonly commands: string[]
+
+  constructor(commands: string[], lastError?: string) {
+    const runtimeHint = process.env.VERCEL
+      ? 'Vercel serverless functions do not include a TeX distribution. Deploy the app with the Dockerfile/runtime that installs TeX Live, or move PDF compilation to a LaTeX worker.'
+      : 'Install TeX Live or MiKTeX on the server, or set LATEX_CMD to the absolute path of an installed LaTeX engine.'
+
+    super(
+      `LaTeX engine not found. Tried: ${commands.join(', ')}. ${runtimeHint}${
+        lastError ? ` Last error: ${lastError}` : ''
+      }`
+    )
+    this.name = 'LatexEngineNotFoundError'
+    this.commands = commands
+  }
+}
+
+class LatexCompilationError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'LatexCompilationError'
+  }
+}
+
+function getLatexCommands(): string[] {
+  const configuredCommand = process.env.LATEX_CMD?.trim()
+  return configuredCommand ? [configuredCommand] : DEFAULT_LATEX_COMMANDS
+}
+
+function isSpawnNotFound(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    'code' in error &&
+    (error as NodeJS.ErrnoException).code === 'ENOENT'
+  )
+}
 
 function getDataUrlImageBuffer(photoUrl?: string): Buffer | null {
   if (!photoUrl?.startsWith('data:image/')) return null
@@ -98,11 +137,10 @@ async function compileLatexToPdf(latex: string, cvData?: CVData): Promise<Buffer
 
     await fs.writeFile(texPath, latexSource, 'utf8')
 
-    const commands = process.env.LATEX_CMD
-      ? [process.env.LATEX_CMD]
-      : ['pdflatex', 'xelatex']
+    const commands = getLatexCommands()
 
     let lastError = ''
+    let missingEngineCount = 0
 
     for (const command of commands) {
       try {
@@ -123,10 +161,17 @@ async function compileLatexToPdf(latex: string, cvData?: CVData): Promise<Buffer
         lastError = result.stderr || result.stdout || `LaTeX command ${command} failed`
       } catch (error) {
         lastError = error instanceof Error ? error.message : String(error)
+        if (isSpawnNotFound(error)) {
+          missingEngineCount += 1
+        }
       }
     }
 
-    throw new Error(lastError || 'LaTeX compilation failed')
+    if (missingEngineCount === commands.length) {
+      throw new LatexEngineNotFoundError(commands, lastError)
+    }
+
+    throw new LatexCompilationError(lastError || 'LaTeX compilation failed')
   } finally {
     try {
       await fs.rm(tempDir, { recursive: true, force: true })
@@ -220,15 +265,19 @@ export async function POST(request: Request) {
     })
   } catch (error) {
     console.error('PDF generation error:', error)
+    const isMissingEngine = error instanceof LatexEngineNotFoundError
+
     return NextResponse.json(
       {
         error: 'Failed to generate PDF',
+        code: isMissingEngine ? 'LATEX_ENGINE_NOT_FOUND' : 'LATEX_COMPILATION_FAILED',
         message:
           error instanceof Error
             ? error.message
             : 'LaTeX compilation failed. Ensure a LaTeX engine (xelatex or pdflatex) is installed on the server.',
+        renderer: 'latex',
       },
-      { status: 500 }
+      { status: isMissingEngine ? 503 : 500 }
     )
   }
 }
