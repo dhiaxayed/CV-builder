@@ -51,6 +51,14 @@ function buildHeuristicSummary(cvData: CVData) {
   )
 }
 
+function formatAiError(error: unknown) {
+  if (error instanceof Error) {
+    return error.message
+  }
+
+  return 'Groq request failed for an unknown reason.'
+}
+
 function getTopExperienceBullets(cvData: CVData, limit = 4) {
   return cvData.experience
     .flatMap((item) => item.bullets.map((bullet) => ({ role: item.role, bullet })))
@@ -265,10 +273,14 @@ export async function generateAtsReview({
       review,
       source: 'groq' as const,
     }
-  } catch {
+  } catch (error) {
+    const aiError = formatAiError(error)
+    console.warn('[AI Review] Groq unavailable, using heuristic fallback:', aiError)
+
     return {
       review: buildFallbackAtsReview(cvData),
       source: 'heuristic-fallback' as const,
+      aiError,
     }
   }
 }
@@ -369,7 +381,10 @@ export async function generateJobTailorAnalysis({
       }),
       source: 'groq' as const,
     }
-  } catch {
+  } catch (error) {
+    const aiError = formatAiError(error)
+    console.warn('[AI Tailor] Groq unavailable, using heuristic fallback:', aiError)
+
     return {
       heuristicMatch,
       extractedKeywords,
@@ -380,6 +395,7 @@ export async function generateJobTailorAnalysis({
         heuristicMatch,
       }),
       source: 'heuristic-fallback' as const,
+      aiError,
     }
   }
 }

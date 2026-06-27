@@ -10,9 +10,22 @@ type ChatCompletionResponse = {
     message?: {
       content?: string
     }
+    finish_reason?: string
   }>
   error?: {
     message?: string
+    type?: string
+    code?: string
+  }
+}
+
+class GroqJsonParseError extends Error {
+  readonly content: string
+
+  constructor(content: string) {
+    super('Groq returned invalid JSON.')
+    this.name = 'GroqJsonParseError'
+    this.content = content
   }
 }
 
@@ -40,29 +53,62 @@ function getGroqHeaders() {
 
 async function postCompletion(body: Record<string, unknown>) {
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), getGroqTimeoutMs())
+  const timeoutMs = getGroqTimeoutMs()
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
 
-  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: getGroqHeaders(),
-    body: JSON.stringify(body),
-    cache: 'no-store',
-    signal: controller.signal,
-  }).finally(() => clearTimeout(timeout))
+  let response: Response
 
-  const payload = (await response.json().catch(() => ({}))) as ChatCompletionResponse
+  try {
+    response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: getGroqHeaders(),
+      body: JSON.stringify(body),
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error(`Groq request timed out after ${timeoutMs}ms.`)
+    }
+
+    throw error instanceof Error ? error : new Error('Groq request failed before receiving a response.')
+  } finally {
+    clearTimeout(timeout)
+  }
+
+  const responseText = await response.text()
+  const payload = parseGroqResponse(responseText)
 
   if (!response.ok) {
-    throw new Error(payload?.error?.message || `Groq request failed with status ${response.status}`)
+    const providerMessage = payload?.error?.message || responseText
+    const providerCode = payload?.error?.code || payload?.error?.type
+    throw new Error(
+      [
+        `Groq request failed with status ${response.status}`,
+        providerCode ? `(${providerCode})` : '',
+        providerMessage ? `- ${providerMessage}` : '',
+      ]
+        .filter(Boolean)
+        .join(' ')
+    )
   }
 
   const content = payload?.choices?.[0]?.message?.content?.trim()
 
   if (!content) {
-    throw new Error('Groq returned an empty response.')
+    const finishReason = payload?.choices?.[0]?.finish_reason
+    throw new Error(`Groq returned an empty response${finishReason ? ` (finish_reason: ${finishReason})` : ''}.`)
   }
 
   return content
+}
+
+function parseGroqResponse(responseText: string): ChatCompletionResponse {
+  try {
+    return JSON.parse(responseText) as ChatCompletionResponse
+  } catch {
+    return {}
+  }
 }
 
 function formatZodIssues(error: z.ZodError) {
@@ -72,11 +118,43 @@ function formatZodIssues(error: z.ZodError) {
 }
 
 function parseJsonObject(content: string) {
+  const normalized = extractJsonObject(content)
+
   try {
-    return JSON.parse(content)
+    return JSON.parse(normalized)
   } catch {
-    throw new Error('Groq returned invalid JSON.')
+    throw new GroqJsonParseError(content)
   }
+}
+
+function extractJsonObject(content: string) {
+  const fencedJson = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/i)?.[1]?.trim()
+  if (fencedJson) return fencedJson
+
+  const start = content.indexOf('{')
+  const end = content.lastIndexOf('}')
+
+  if (start !== -1 && end > start) {
+    return content.slice(start, end + 1)
+  }
+
+  return content.trim()
+}
+
+function describeStructureError(error: unknown) {
+  if (error instanceof z.ZodError) {
+    return formatZodIssues(error)
+  }
+
+  if (error instanceof GroqJsonParseError) {
+    return error.message
+  }
+
+  return error instanceof Error ? error.message : 'Unknown JSON validation error.'
+}
+
+function truncateForRepair(content: string, maxLength = 6000) {
+  return content.length > maxLength ? `${content.slice(0, maxLength)}\n...[truncated]` : content
 }
 
 export async function generateStructuredObject<T extends z.ZodTypeAny>({
@@ -107,50 +185,43 @@ export async function generateStructuredObject<T extends z.ZodTypeAny>({
     },
   ]
 
+  const completionBody = {
+    model,
+    messages: requestMessages,
+    temperature,
+    max_completion_tokens: maxCompletionTokens,
+    response_format: {
+      type: 'json_object',
+    },
+  }
+
+  const content = await postCompletion(completionBody)
+
   try {
-    const content = await postCompletion({
-      model,
-      messages: requestMessages,
-      temperature,
-      max_completion_tokens: maxCompletionTokens,
-      user,
-      response_format: {
-        type: 'json_object',
-      },
+    return schema.parse(parseJsonObject(content))
+  } catch (structureError) {
+    const repairContent = await postCompletion({
+      ...completionBody,
+      temperature: 0.1,
+      messages: [
+        ...requestMessages,
+        {
+          role: 'assistant',
+          content: truncateForRepair(content),
+        },
+        {
+          role: 'user',
+          content: [
+            'The previous response did not satisfy the required JSON contract.',
+            'Repair it into exactly one valid JSON object matching the requested shape.',
+            'Return only corrected JSON without markdown.',
+            `Validation issues: ${describeStructureError(structureError)}`,
+          ].join('\n'),
+        },
+      ],
     })
 
-    return schema.parse(parseJsonObject(content))
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      const repairContent = await postCompletion({
-        model,
-        messages: [
-          ...requestMessages,
-          {
-            role: 'assistant',
-            content: 'The previous JSON response did not fully satisfy the requested schema.',
-          },
-          {
-            role: 'user',
-            content: [
-              'Repair the JSON so it satisfies the required structure.',
-              'Return only corrected JSON without markdown.',
-              `Validation issues: ${formatZodIssues(error)}`,
-            ].join('\n'),
-          },
-        ],
-        temperature: 0.1,
-        max_completion_tokens: maxCompletionTokens,
-        user,
-        response_format: {
-          type: 'json_object',
-        },
-      })
-
-      return schema.parse(parseJsonObject(repairContent))
-    }
-
-    throw error instanceof Error ? error : new Error('Failed to parse Groq JSON response.')
+    return schema.parse(parseJsonObject(repairContent))
   }
 }
 

@@ -44,11 +44,13 @@ type ReviewResponse = {
   review: AIAtsReview
   heuristicReport: ATSReport
   source: 'groq' | 'heuristic-fallback'
+  aiError?: string
 }
 
 type TailorResponse = {
   analysis: AIJobTailorAnalysis
   source: 'groq' | 'heuristic-fallback'
+  aiError?: string
   savedJobDescriptionId?: string | null
   heuristicMatch: {
     extractedKeywords: string[]
@@ -282,7 +284,8 @@ export function AIAssistantPanel({
               <div className="space-y-3 rounded-lg border p-3">
                 {reviewData.source === 'heuristic-fallback' && (
                   <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-                    Groq was unavailable, so this review used the local ATS heuristic engine.
+                    <p>Groq was unavailable, so this review used the local ATS heuristic engine.</p>
+                    {reviewData.aiError && <p className="mt-1">Reason: {reviewData.aiError}</p>}
                   </div>
                 )}
                 <div className="grid grid-cols-3 gap-2 text-center">
@@ -487,7 +490,8 @@ export function AIAssistantPanel({
               <div className="space-y-3 rounded-lg border p-3">
                 {tailorData.source === 'heuristic-fallback' && (
                   <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-                    Groq was unavailable, so this tailoring package used local keyword and ATS heuristics.
+                    <p>Groq was unavailable, so this tailoring package used local keyword and ATS heuristics.</p>
+                    {tailorData.aiError && <p className="mt-1">Reason: {tailorData.aiError}</p>}
                   </div>
                 )}
                 <div className="grid grid-cols-3 gap-2 text-center">
