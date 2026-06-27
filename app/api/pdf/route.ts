@@ -4,6 +4,7 @@ import { getSessionUser } from '@/lib/db/users'
 import { getCVWithCurrentVersion, recordCVExport } from '@/lib/db/cvs'
 import { CVData } from '@/lib/types/cv'
 import { generateLatex } from '@/lib/latex/generator'
+import { existsSync } from 'fs'
 import { promises as fs } from 'fs'
 import { tmpdir } from 'os'
 import path from 'path'
@@ -64,6 +65,11 @@ function isSpawnNotFound(error: unknown): boolean {
 }
 
 function resolveTectonicPath(): string {
+  const vendoredTectonicPath = path.join(process.cwd(), 'vendor', 'tectonic-linux-x64', 'bin', 'tectonic')
+  if (existsSync(vendoredTectonicPath)) {
+    return vendoredTectonicPath
+  }
+
   const compiler = createCompiler() as unknown as {
     isAvailable: () => boolean
     tectonicPath?: string | null

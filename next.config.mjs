@@ -8,7 +8,8 @@ const nextConfig = {
     '@node-latex-compiler/bin-linux-x64',
   ],
   outputFileTracingIncludes: {
-    '/api/pdf': ['./vendor/tectonic-linux-x64/lib/**/*'],
+    '/api/pdf': ['./vendor/tectonic-linux-x64/**/*'],
+    '/api/health': ['./vendor/tectonic-linux-x64/**/*'],
   },
 }
 

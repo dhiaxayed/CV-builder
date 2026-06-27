@@ -5,10 +5,12 @@ import { pipeline } from 'stream/promises'
 import { spawn } from 'child_process'
 
 const isLinuxX64 = process.platform === 'linux' && process.arch === 'x64'
-const vendorDir = path.join(process.cwd(), 'vendor', 'tectonic-linux-x64', 'lib')
-const debUrl =
-  process.env.GRAPHITE2_DEB_URL ||
-  'https://deb.debian.org/debian/pool/main/g/graphite2/libgraphite2-3_1.3.14-2+b1_amd64.deb'
+const vendorRoot = path.join(process.cwd(), 'vendor', 'tectonic-linux-x64')
+const vendorBinDir = path.join(vendorRoot, 'bin')
+const tectonicVersion = process.env.TECTONIC_VERSION || '0.16.9'
+const tectonicUrl =
+  process.env.TECTONIC_MUSL_URL ||
+  `https://github.com/tectonic-typesetting/tectonic/releases/download/tectonic%40${tectonicVersion}/tectonic-${tectonicVersion}-x86_64-unknown-linux-musl.tar.gz`
 
 async function command(command, args, cwd) {
   return new Promise((resolve, reject) => {
@@ -32,71 +34,64 @@ async function download(url, destination) {
 
 async function main() {
   if (!isLinuxX64) {
-    console.log('[tectonic-libs] Skipping runtime library install: not linux x64.')
+    console.log('[tectonic-runtime] Skipping portable Tectonic install: not linux x64.')
     return
   }
 
-  await fs.mkdir(vendorDir, { recursive: true })
+  await fs.mkdir(vendorBinDir, { recursive: true })
 
-  const target = path.join(vendorDir, 'libgraphite2.so.3')
+  const target = path.join(vendorBinDir, 'tectonic')
   try {
     await fs.access(target)
-    console.log('[tectonic-libs] libgraphite2.so.3 already installed.')
+    console.log('[tectonic-runtime] Portable Tectonic already installed.')
     return
   } catch {
     // Continue install.
   }
 
   const workDir = await fs.mkdtemp(path.join(tmpdir(), 'tectonic-libs-'))
-  const debPath = path.join(workDir, 'libgraphite2.deb')
+  const archivePath = path.join(workDir, 'tectonic.tar.gz')
   const extractDir = path.join(workDir, 'extract')
-  const dataDir = path.join(workDir, 'data')
 
   try {
     await fs.mkdir(extractDir, { recursive: true })
-    await fs.mkdir(dataDir, { recursive: true })
 
-    console.log(`[tectonic-libs] Downloading ${debUrl}`)
-    await download(debUrl, debPath)
+    console.log(`[tectonic-runtime] Downloading ${tectonicUrl}`)
+    await download(tectonicUrl, archivePath)
 
-    await command('ar', ['x', debPath], extractDir)
+    await command('tar', ['-xzf', archivePath, '-C', extractDir], process.cwd())
 
-    const entries = await fs.readdir(extractDir)
-    const dataArchive = entries.find((entry) => entry.startsWith('data.tar.'))
-    if (!dataArchive) {
-      throw new Error('Debian package did not contain data.tar archive.')
-    }
-
-    await command('tar', ['-xf', path.join(extractDir, dataArchive), '-C', dataDir], process.cwd())
-
-    const candidates = [
-      path.join(dataDir, 'usr', 'lib', 'x86_64-linux-gnu', 'libgraphite2.so.3'),
-      path.join(dataDir, 'usr', 'lib64', 'libgraphite2.so.3'),
-    ]
-
-    let libSource = null
-    for (const candidate of candidates) {
-      try {
-        await fs.access(candidate)
-        libSource = candidate
-        break
-      } catch {
-        // Continue searching.
-      }
-    }
-
-    if (!libSource) {
-      throw new Error('Could not find libgraphite2.so.3 inside extracted Debian package.')
-    }
-
-    await fs.copyFile(libSource, target)
-    console.log(`[tectonic-libs] Installed ${target}`)
+    const source = await findFile(extractDir, 'tectonic')
+    await fs.copyFile(source, target)
+    await fs.chmod(target, 0o755)
+    console.log(`[tectonic-runtime] Installed ${target}`)
   } finally {
     await fs.rm(workDir, { recursive: true, force: true })
   }
 }
 
+async function findFile(root, fileName) {
+  const entries = await fs.readdir(root, { withFileTypes: true })
+
+  for (const entry of entries) {
+    const fullPath = path.join(root, entry.name)
+    if (entry.isFile() && entry.name === fileName) {
+      return fullPath
+    }
+
+    if (entry.isDirectory()) {
+      try {
+        return await findFile(fullPath, fileName)
+      } catch {
+        // Continue searching.
+      }
+    }
+  }
+
+  throw new Error(`Could not find ${fileName} inside extracted Tectonic archive.`)
+}
+
 main().catch((error) => {
-  console.error('[tectonic-libs] Install failed:', error)
+  console.error('[tectonic-runtime] Install failed:', error)
   process.exit(1)
 })

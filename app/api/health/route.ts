@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { spawn } from 'child_process'
 import { createCompiler } from 'node-latex-compiler'
+import { existsSync } from 'fs'
 import { promises as fs } from 'fs'
 import { tmpdir } from 'os'
 import path from 'path'
@@ -61,6 +62,11 @@ async function checkCommand(command: string): Promise<{ command: string; availab
 }
 
 function resolveTectonicPath(): string | null {
+  const vendoredTectonicPath = path.join(process.cwd(), 'vendor', 'tectonic-linux-x64', 'bin', 'tectonic')
+  if (existsSync(vendoredTectonicPath)) {
+    return vendoredTectonicPath
+  }
+
   try {
     const compiler = createCompiler() as unknown as {
       isAvailable: () => boolean
