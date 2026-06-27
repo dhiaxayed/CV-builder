@@ -118,7 +118,7 @@ export default function SignInPage() {
               <FileText className="h-8 w-8" />
               <span className="text-2xl font-bold">CV Builder</span>
             </div>
-            <p className="text-primary-foreground/80">Create ATS-friendly resumes that get you hired</p>
+            <p className="text-primary-foreground/80">Create ATS-friendly CVs for job applications</p>
           </div>
           
           <div className="space-y-8">
@@ -160,7 +160,7 @@ export default function SignInPage() {
           </div>
           
           <p className="text-primary-foreground/60 text-sm">
-            Trusted by thousands of job seekers worldwide
+            Built around real editing, ATS review, versioning, sharing, and export workflows
           </p>
         </div>
         

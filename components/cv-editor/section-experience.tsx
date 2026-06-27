@@ -1,7 +1,7 @@
 'use client'
 
 import { ExperienceItem } from '@/lib/types/cv'
-import { generateId } from '@/lib/storage'
+import { nanoid } from 'nanoid'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -23,7 +23,7 @@ export function SectionExperience({ data = [], onChange }: SectionExperienceProp
   
   const addItem = () => {
     const newItem: ExperienceItem = {
-      id: generateId(),
+      id: nanoid(),
       company: '',
       role: '',
       location: '',
@@ -115,7 +115,7 @@ export function SectionExperience({ data = [], onChange }: SectionExperienceProp
                         {item.role || 'Untitled Position'}
                       </p>
                       <p className="text-sm text-muted-foreground truncate">
-                        {item.company || 'Company'} {item.startDate && `• ${item.startDate}`}
+                        {item.company || 'Company'} {item.startDate && `- ${item.startDate}`}
                       </p>
                     </div>
                     <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200" />

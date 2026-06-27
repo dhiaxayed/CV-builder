@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AIAtsReview, AIJobTailorAnalysis } from '@/lib/ai/types'
 import { ATSReport, CVData } from '@/lib/types/cv'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -43,10 +43,13 @@ interface AIAssistantPanelProps {
 type ReviewResponse = {
   review: AIAtsReview
   heuristicReport: ATSReport
+  source: 'openrouter' | 'heuristic-fallback'
 }
 
 type TailorResponse = {
   analysis: AIJobTailorAnalysis
+  source: 'openrouter' | 'heuristic-fallback'
+  savedJobDescriptionId?: string | null
   heuristicMatch: {
     extractedKeywords: string[]
     matchedKeywords: string[]
@@ -54,6 +57,14 @@ type TailorResponse = {
     score: number
     suggestions: string[]
   }
+}
+
+type JobDescriptionHistoryItem = {
+  id: string
+  title: string
+  company: string | null
+  match_score: number | null
+  created_at: string
 }
 
 export function AIAssistantPanel({
@@ -72,10 +83,28 @@ export function AIAssistantPanel({
   const [tailorData, setTailorData] = useState<TailorResponse | null>(null)
   const [reviewError, setReviewError] = useState<string | null>(null)
   const [tailorError, setTailorError] = useState<string | null>(null)
+  const [jobHistory, setJobHistory] = useState<JobDescriptionHistoryItem[]>([])
   const [jobTitle, setJobTitle] = useState('')
   const [company, setCompany] = useState('')
   const [jobDescription, setJobDescription] = useState('')
   const isProUser = user?.tier === 'pro'
+
+  const loadJobHistory = async () => {
+    if (!isProUser) {
+      setJobHistory([])
+      return
+    }
+
+    const response = await fetch('/api/ai/job-descriptions')
+    if (!response.ok) return
+
+    const payload = (await response.json()) as { jobDescriptions?: JobDescriptionHistoryItem[] }
+    setJobHistory(payload.jobDescriptions || [])
+  }
+
+  useEffect(() => {
+    loadJobHistory()
+  }, [isProUser])
 
   const scoreTone = useMemo(() => {
     const score = reviewData?.review.atsReadinessScore ?? tailorData?.analysis.atsFitScore ?? 0
@@ -102,7 +131,12 @@ export function AIAssistantPanel({
       }
 
       setReviewData(payload)
-      toast({ title: 'AI ATS review ready' })
+      toast({
+        title:
+          payload.source === 'heuristic-fallback'
+            ? 'ATS review ready (heuristic fallback)'
+            : 'AI ATS review ready',
+      })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to generate AI ATS review'
       setReviewError(message)
@@ -156,7 +190,13 @@ export function AIAssistantPanel({
       }
 
       setTailorData(payload)
-      toast({ title: 'AI job tailoring ready' })
+      await loadJobHistory()
+      toast({
+        title:
+          payload.source === 'heuristic-fallback'
+            ? 'Job tailoring ready (heuristic fallback)'
+            : 'AI job tailoring ready',
+      })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to tailor CV'
       setTailorError(message)
@@ -224,6 +264,11 @@ export function AIAssistantPanel({
 
             {reviewData && (
               <div className="space-y-3 rounded-lg border p-3">
+                {reviewData.source === 'heuristic-fallback' && (
+                  <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                    OpenRouter was unavailable, so this review used the local ATS heuristic engine.
+                  </div>
+                )}
                 <div className="grid grid-cols-3 gap-2 text-center">
                   <div className="rounded-md bg-muted p-2">
                     <div className={cn('text-2xl font-bold', scoreTone)}>{reviewData.review.atsReadinessScore}%</div>
@@ -354,6 +399,24 @@ export function AIAssistantPanel({
                 </div>
               )}
               <div className="space-y-3">
+                {isProUser && jobHistory.length > 0 && (
+                  <div className="rounded-md border bg-background p-3">
+                    <p className="mb-2 text-xs font-medium">Recent job targets</p>
+                    <div className="space-y-2">
+                      {jobHistory.slice(0, 3).map((item) => (
+                        <div key={item.id} className="flex items-center justify-between gap-2 text-xs">
+                          <div className="min-w-0">
+                            <p className="truncate font-medium">{item.title}</p>
+                            {item.company && <p className="truncate text-muted-foreground">{item.company}</p>}
+                          </div>
+                          {typeof item.match_score === 'number' && (
+                            <Badge variant="outline">{item.match_score}%</Badge>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="space-y-1">
                   <Label htmlFor="ai-target-job-title" className="text-xs font-medium">
                     Target Job Title
@@ -406,6 +469,11 @@ export function AIAssistantPanel({
 
             {tailorData && (
               <div className="space-y-3 rounded-lg border p-3">
+                {tailorData.source === 'heuristic-fallback' && (
+                  <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                    OpenRouter was unavailable, so this tailoring package used local keyword and ATS heuristics.
+                  </div>
+                )}
                 <div className="grid grid-cols-3 gap-2 text-center">
                   <div className="rounded-md bg-muted p-2">
                     <div className="text-2xl font-bold text-primary">{tailorData.analysis.matchScore}%</div>

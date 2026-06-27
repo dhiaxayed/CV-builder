@@ -79,6 +79,7 @@ export default function ExportPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           cvData: cv.data,
+          cvId: cv.id,
           templateId: cv.template_id,
           title: cv.title,
           format,

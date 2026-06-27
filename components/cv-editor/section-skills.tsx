@@ -1,7 +1,7 @@
 'use client'
 
 import { SkillGroup } from '@/lib/types/cv'
-import { generateId } from '@/lib/storage'
+import { nanoid } from 'nanoid'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -20,7 +20,7 @@ export function SectionSkills({ data, onChange }: SectionSkillsProps) {
   
   const addGroup = () => {
     const newGroup: SkillGroup = {
-      id: generateId(),
+      id: nanoid(),
       category: '',
       skills: [],
     }

@@ -199,7 +199,7 @@ export async function generateAtsReview({
   userId?: string
 }) {
   try {
-    return await generateStructuredObject({
+    const review = await generateStructuredObject({
       schema: aiAtsReviewSchema,
       shapeInstructions: JSON.stringify(
         {
@@ -258,8 +258,15 @@ export async function generateAtsReview({
         },
       ],
     })
+    return {
+      review,
+      source: 'openrouter' as const,
+    }
   } catch {
-    return buildFallbackAtsReview(cvData)
+    return {
+      review: buildFallbackAtsReview(cvData),
+      source: 'heuristic-fallback' as const,
+    }
   }
 }
 
@@ -355,6 +362,7 @@ export async function generateJobTailorAnalysis({
           },
         ],
       }),
+      source: 'openrouter' as const,
     }
   } catch {
     return {
@@ -366,6 +374,7 @@ export async function generateJobTailorAnalysis({
         company,
         heuristicMatch,
       }),
+      source: 'heuristic-fallback' as const,
     }
   }
 }

@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     
     if (!emailResult.success) {
       console.error('[Auth] Failed to send magic link email:', emailResult.error)
-      // Still return success to not leak information about email delivery
+      return NextResponse.json({ error: 'Failed to send magic link email' }, { status: 502 })
     }
     
     // Log in development

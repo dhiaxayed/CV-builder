@@ -58,7 +58,7 @@ export async function POST(
     
     const { data, note } = await request.json()
     
-    const version = await createCVVersion(id, data, note)
+    const version = await createCVVersion(id, data, note, user.id)
     
     return NextResponse.json({ version })
   } catch (error) {
@@ -93,6 +93,9 @@ export async function PUT(
     const { versionId } = await request.json()
     
     const updatedCV = await restoreCVVersion(id, versionId)
+    if (!updatedCV) {
+      return NextResponse.json({ error: 'Version not found for this CV' }, { status: 404 })
+    }
     
     return NextResponse.json({ cv: updatedCV })
   } catch (error) {

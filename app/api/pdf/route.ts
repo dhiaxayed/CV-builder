@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { getSessionUser } from '@/lib/db/users'
+import { getCV, recordCVExport } from '@/lib/db/cvs'
 import { CVData } from '@/lib/types/cv'
 import { generateLatex } from '@/lib/latex/generator'
 import { promises as fs } from 'fs'
@@ -8,9 +9,12 @@ import { tmpdir } from 'os'
 import path from 'path'
 import { spawn } from 'child_process'
 import { PDFDocument, StandardFonts, rgb, type RGB } from 'pdf-lib'
+import sharp from 'sharp'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
+
+const MAX_PDF_PHOTO_BYTES = 5 * 1024 * 1024
 
 function hasLatexRuntimeError(message: string): boolean {
   const lowered = message.toLowerCase()
@@ -63,11 +67,51 @@ function getFallbackStyle(templateId?: string): SimplePdfStyle {
   return FALLBACK_TEMPLATE_STYLES[templateId] ?? FALLBACK_TEMPLATE_STYLES.modern
 }
 
+function getDataUrlImageBuffer(photoUrl?: string): Buffer | null {
+  if (!photoUrl?.startsWith('data:image/')) return null
+
+  const match = photoUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/)
+  if (!match) return null
+
+  const buffer = Buffer.from(match[2], 'base64')
+  if (buffer.length === 0 || buffer.length > MAX_PDF_PHOTO_BYTES) return null
+  return buffer
+}
+
+async function getPngPhotoBuffer(photoUrl?: string): Promise<Buffer | null> {
+  const source = getDataUrlImageBuffer(photoUrl)
+  if (!source) return null
+
+  return sharp(source, { animated: false })
+    .rotate()
+    .resize({ width: 256, height: 256, fit: 'cover', withoutEnlargement: true })
+    .png()
+    .toBuffer()
+}
+
+function injectLatexPhoto(latex: string, photoFileName: string): string {
+  const graphicxPattern = /\\usepackage(?:\[[^\]]*\])?\{graphicx\}/
+  const withPackage = graphicxPattern.test(latex)
+    ? latex
+    : latex.replace('\\begin{document}', '\\usepackage{graphicx}\n\\begin{document}')
+
+  return withPackage.replace(
+    '\\begin{document}',
+    `\\begin{document}
+\\begin{center}
+\\includegraphics[width=2.4cm,height=2.4cm,keepaspectratio]{${photoFileName}}
+\\end{center}
+\\vspace{0.2cm}
+`
+  )
+}
+
 async function generateSimplePdf(cvData: CVData, templateId?: string): Promise<Uint8Array> {
   const doc = await PDFDocument.create()
-  const page = doc.addPage([595.28, 841.89]) // A4
   const font = await doc.embedFont(StandardFonts.Helvetica)
   const bold = await doc.embedFont(StandardFonts.HelveticaBold)
+  const photoBuffer = await getPngPhotoBuffer(cvData.basics?.photoUrl)
+  const photoImage = photoBuffer ? await doc.embedPng(photoBuffer) : null
   const style = getFallbackStyle(templateId)
   const bannerColor = toRgb(style.banner)
   const accentColor = toRgb(style.accent)
@@ -77,34 +121,46 @@ async function generateSimplePdf(cvData: CVData, templateId?: string): Promise<U
 
   const margin = 40
   const bannerHeight = 46
-  if (sidebarColor) {
+  let page = doc.addPage([595.28, 841.89]) // A4
+  const width = page.getWidth() - margin * 2
+
+  const drawPageChrome = () => {
+    if (sidebarColor) {
+      page.drawRectangle({
+        x: 0,
+        y: 0,
+        width: 16,
+        height: page.getHeight(),
+        color: sidebarColor,
+      })
+    }
+
     page.drawRectangle({
       x: 0,
-      y: 0,
-      width: 16,
-      height: page.getHeight(),
-      color: sidebarColor,
+      y: page.getHeight() - bannerHeight,
+      width: page.getWidth(),
+      height: bannerHeight,
+      color: bannerColor,
+    })
+
+    page.drawText(`Template: ${style.label} (Compatibility PDF)`, {
+      x: margin,
+      y: page.getHeight() - 30,
+      size: 11,
+      font: bold,
+      color: invertedText,
     })
   }
 
-  page.drawRectangle({
-    x: 0,
-    y: page.getHeight() - bannerHeight,
-    width: page.getWidth(),
-    height: bannerHeight,
-    color: bannerColor,
-  })
-
-  page.drawText(`Template: ${style.label} (Compatibility PDF)`, {
-    x: margin,
-    y: page.getHeight() - 30,
-    size: 11,
-    font: bold,
-    color: invertedText,
-  })
-
-  const width = page.getWidth() - margin * 2
   let y = page.getHeight() - bannerHeight - margin + 4
+  drawPageChrome()
+
+  const ensureSpace = (height: number) => {
+    if (y >= margin + height) return
+    page = doc.addPage([595.28, 841.89])
+    drawPageChrome()
+    y = page.getHeight() - bannerHeight - margin + 4
+  }
 
   const drawWrapped = (text: string, size = 10, isBold = false, color: RGB = textColor) => {
     const activeFont = isBold ? bold : font
@@ -115,20 +171,14 @@ async function generateSimplePdf(cvData: CVData, templateId?: string): Promise<U
       if (activeFont.widthOfTextAtSize(candidate, size) <= width) {
         line = candidate
       } else {
-        if (y < margin + 20) {
-          y = margin
-          return
-        }
+        ensureSpace(size + 4)
         page.drawText(line, { x: margin, y, size, font: activeFont, color })
         y -= size + 4
         line = word
       }
     }
     if (line) {
-      if (y < margin + 20) {
-        y = margin
-        return
-      }
+      ensureSpace(size + 4)
       page.drawText(line, { x: margin, y, size, font: activeFont, color })
       y -= size + 4
     }
@@ -138,6 +188,18 @@ async function generateSimplePdf(cvData: CVData, templateId?: string): Promise<U
     y -= 6
     drawWrapped(title, 12, true, accentColor)
     y -= 2
+  }
+
+  if (photoImage) {
+    const photoSize = 68
+    ensureSpace(photoSize + 10)
+    page.drawImage(photoImage, {
+      x: (page.getWidth() - photoSize) / 2,
+      y: y - photoSize,
+      width: photoSize,
+      height: photoSize,
+    })
+    y -= photoSize + 12
   }
 
   drawWrapped(cvData.basics?.name || 'Unnamed Candidate', 20, true)
@@ -184,6 +246,9 @@ async function generateSimplePdf(cvData: CVData, templateId?: string): Promise<U
       if (edu.gpa) {
         drawWrapped(`GPA: ${edu.gpa}`, 9)
       }
+      if (edu.highlights?.length) {
+        drawWrapped(`Highlights: ${edu.highlights.join(', ')}`, 9)
+      }
       y -= 4
     }
   }
@@ -192,6 +257,64 @@ async function generateSimplePdf(cvData: CVData, templateId?: string): Promise<U
     drawSectionTitle('Skills')
     for (const group of cvData.skills) {
       drawWrapped(`${group.category}: ${(group.skills || []).join(', ')}`, 10)
+    }
+  }
+
+  if (cvData.projects?.length) {
+    drawSectionTitle('Projects')
+    for (const project of cvData.projects) {
+      drawWrapped(project.name || 'Project', 10, true)
+      const projectMeta = [
+        project.url,
+        formatDateRange(project.startDate, project.endDate, false),
+      ].filter(Boolean)
+      if (projectMeta.length) {
+        drawWrapped(projectMeta.join(' | '), 9)
+      }
+      if (project.description) {
+        drawWrapped(project.description, 10)
+      }
+      for (const bullet of project.bullets || []) {
+        drawWrapped(`- ${bullet}`, 10)
+      }
+      if (project.technologies?.length) {
+        drawWrapped(`Technologies: ${project.technologies.join(', ')}`, 9)
+      }
+      y -= 4
+    }
+  }
+
+  if (cvData.certifications?.length) {
+    drawSectionTitle('Certifications')
+    for (const cert of cvData.certifications) {
+      const dateLabel = [cert.date, cert.expirationDate ? `Valid until ${cert.expirationDate}` : '']
+        .filter(Boolean)
+        .join(' | ')
+      drawWrapped(`${cert.name} - ${cert.issuer}${dateLabel ? ` (${dateLabel})` : ''}`, 10)
+    }
+  }
+
+  if (cvData.awards?.length) {
+    drawSectionTitle('Awards')
+    for (const award of cvData.awards) {
+      drawWrapped(`${award.title} - ${award.issuer}${award.date ? ` (${award.date})` : ''}`, 10, true)
+      if (award.description) {
+        drawWrapped(award.description, 10)
+      }
+    }
+  }
+
+  if (cvData.languages?.length) {
+    drawSectionTitle('Languages')
+    drawWrapped(cvData.languages.map((item) => `${item.language}: ${item.proficiency}`).join(' | '), 10)
+  }
+
+  if (cvData.customSections?.length) {
+    for (const section of cvData.customSections) {
+      drawSectionTitle(section.title)
+      for (const item of section.content || []) {
+        drawWrapped(section.type === 'bullets' ? `- ${item}` : item, 10)
+      }
     }
   }
 
@@ -227,13 +350,20 @@ async function runLatex(command: string, args: string[], cwd: string): Promise<{
   })
 }
 
-async function compileLatexToPdf(latex: string): Promise<Buffer> {
+async function compileLatexToPdf(latex: string, cvData?: CVData): Promise<Buffer> {
   const tempDir = await fs.mkdtemp(path.join(tmpdir(), 'cv-pdf-'))
   const texPath = path.join(tempDir, 'cv.tex')
   const pdfPath = path.join(tempDir, 'cv.pdf')
 
   try {
-    await fs.writeFile(texPath, latex, 'utf8')
+    const photoBuffer = await getPngPhotoBuffer(cvData?.basics?.photoUrl)
+    const latexSource = photoBuffer ? injectLatexPhoto(latex, 'cv_photo.png') : latex
+
+    if (photoBuffer) {
+      await fs.writeFile(path.join(tempDir, 'cv_photo.png'), photoBuffer)
+    }
+
+    await fs.writeFile(texPath, latexSource, 'utf8')
 
     const commands = process.env.LATEX_CMD
       ? [process.env.LATEX_CMD]
@@ -287,10 +417,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { cvData, format, templateId, title } = await request.json()
+    const { cvData, cvId, format, templateId, title } = await request.json()
 
     if (!cvData) {
       return NextResponse.json({ error: 'No CV data provided' }, { status: 400 })
+    }
+
+    if (cvId) {
+      const cv = await getCV(String(cvId))
+      if (!cv || cv.user_id !== user.id) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+      }
     }
 
     const requestedTemplateId =
@@ -300,6 +437,7 @@ export async function POST(request: Request) {
 
     if (format === 'latex') {
       const latex = generateLatex(cvData as CVData, requestedTemplateId)
+      if (cvId) await recordCVExport(String(cvId))
       return new NextResponse(latex, {
         headers: {
           'Content-Type': 'text/plain',
@@ -309,6 +447,7 @@ export async function POST(request: Request) {
     }
 
     if (format === 'json') {
+      if (cvId) await recordCVExport(String(cvId))
       return new NextResponse(JSON.stringify(cvData, null, 2), {
         headers: {
           'Content-Type': 'application/json',
@@ -323,7 +462,7 @@ export async function POST(request: Request) {
     let renderMode: 'latex' | 'fallback' = 'latex'
     let pdfBytes: Uint8Array
     try {
-      const pdfBuffer = await compileLatexToPdf(latex)
+      const pdfBuffer = await compileLatexToPdf(latex, normalizedCV)
       pdfBytes = new Uint8Array(pdfBuffer)
     } catch (latexError) {
       const message = latexError instanceof Error ? latexError.message : String(latexError)
@@ -334,6 +473,8 @@ export async function POST(request: Request) {
       renderMode = 'fallback'
       pdfBytes = await generateSimplePdf(normalizedCV, requestedTemplateId)
     }
+
+    if (cvId) await recordCVExport(String(cvId))
 
     return new NextResponse(Buffer.from(pdfBytes), {
       headers: {

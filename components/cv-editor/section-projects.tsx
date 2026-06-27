@@ -1,7 +1,7 @@
 'use client'
 
 import { ProjectItem } from '@/lib/types/cv'
-import { generateId } from '@/lib/storage'
+import { nanoid } from 'nanoid'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -22,7 +22,7 @@ export function SectionProjects({ data = [], onChange }: SectionProjectsProps) {
   
   const addItem = () => {
     const newItem: ProjectItem = {
-      id: generateId(),
+      id: nanoid(),
       name: '',
       description: '',
       url: '',

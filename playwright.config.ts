@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'https://cv-builder-gray-five.vercel.app';
+const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3001';
 const shouldStartWebServer = process.env.PLAYWRIGHT_SKIP_WEBSERVER !== '1';
 
 /**
@@ -48,7 +48,7 @@ export default defineConfig({
   /* Run your local dev server before starting the tests */
   webServer: shouldStartWebServer
     ? {
-        command: 'pnpm dev --port 3001',
+        command: 'pnpm dev --hostname localhost --port 3001',
         url: baseURL,
         reuseExistingServer: !process.env.CI,
       }

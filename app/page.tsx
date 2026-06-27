@@ -23,7 +23,6 @@ import {
   FileSearch,
   Palette,
   ChevronRight,
-  Play,
 } from 'lucide-react'
 
 const TEMPLATE_GROUPS = [
@@ -186,10 +185,6 @@ export default function HomePage() {
               >
                 Start Building for Free
                 <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-              <Button size="lg" variant="outline" className="h-14 px-8 text-lg">
-                <Play className="mr-2 h-5 w-5" />
-                Watch Demo
               </Button>
             </div>
             <p className="text-sm text-muted-foreground">
@@ -420,7 +415,7 @@ export default function HomePage() {
                   className="w-full bg-linear-to-r from-primary to-purple-600"
                   onClick={() => router.push('/auth/signin')}
                 >
-                  Upgrade to Pro
+                  Sign in for Pro access
                 </Button>
               </CardContent>
             </Card>
@@ -488,38 +483,18 @@ export default function HomePage() {
               </ul>
             </div>
             <div>
-              <h4 className="mb-4 font-semibold">Resources</h4>
+              <h4 className="mb-4 font-semibold">Plans</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>
-                  <a href="#" className="hover:text-primary">
-                    Blog
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-primary">
-                    CV Tips
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-primary">
-                    Career Advice
-                  </a>
-                </li>
+                <li>Free: 1 CV</li>
+                <li>Pro: manually activated in the database</li>
               </ul>
             </div>
             <div>
-              <h4 className="mb-4 font-semibold">Legal</h4>
+              <h4 className="mb-4 font-semibold">Exports</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>
-                  <a href="#" className="hover:text-primary">
-                    Privacy Policy
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-primary">
-                    Terms of Service
-                  </a>
-                </li>
+                <li>PDF</li>
+                <li>LaTeX source</li>
+                <li>JSON backup</li>
               </ul>
             </div>
           </div>

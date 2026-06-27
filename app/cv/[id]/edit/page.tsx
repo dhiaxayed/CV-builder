@@ -410,11 +410,15 @@ export default function CVEditorPage() {
       setCv({ ...cv, template_id: templateId })
       
       // Save to database
-      await fetch(`/api/cvs/${cv.id}`, {
+      const response = await fetch(`/api/cvs/${cv.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ templateId }),
       })
+
+      if (!response.ok) {
+        throw new Error('Failed to change template')
+      }
       
       toast({ title: 'Template changed' })
     } catch {
@@ -450,6 +454,7 @@ export default function CVEditorPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           cvData, 
+          cvId: cv?.id,
           templateId: cv?.template_id,
           title: cv?.title,
           format: 'pdf',

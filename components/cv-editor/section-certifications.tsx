@@ -1,7 +1,7 @@
 'use client'
 
 import { CertificationItem } from '@/lib/types/cv'
-import { generateId } from '@/lib/storage'
+import { nanoid } from 'nanoid'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -18,7 +18,7 @@ export function SectionCertifications({ data = [], onChange }: SectionCertificat
   
   const addItem = () => {
     const newItem: CertificationItem = {
-      id: generateId(),
+      id: nanoid(),
       name: '',
       issuer: '',
       date: '',

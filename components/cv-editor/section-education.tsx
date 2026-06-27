@@ -1,7 +1,7 @@
 'use client'
 
 import { EducationItem } from '@/lib/types/cv'
-import { generateId } from '@/lib/storage'
+import { nanoid } from 'nanoid'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -21,7 +21,7 @@ export function SectionEducation({ data = [], onChange }: SectionEducationProps)
   
   const addItem = () => {
     const newItem: EducationItem = {
-      id: generateId(),
+      id: nanoid(),
       institution: '',
       degree: '',
       field: '',
@@ -92,7 +92,7 @@ export function SectionEducation({ data = [], onChange }: SectionEducationProps)
                         {item.degree || 'Degree'} {item.field && `in ${item.field}`}
                       </p>
                       <p className="text-sm text-muted-foreground truncate">
-                        {item.institution || 'Institution'} {item.endDate && `• ${item.endDate}`}
+                        {item.institution || 'Institution'} {item.endDate && `- ${item.endDate}`}
                       </p>
                     </div>
                     <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200" />

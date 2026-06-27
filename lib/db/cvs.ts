@@ -287,6 +287,15 @@ export async function createCVVersion(
 
 export async function restoreCVVersion(cvId: string, versionId: string): Promise<DbCV | null> {
   if (!supabase || !isDatabaseConfigured()) return null
+
+  const { data: version, error: versionError } = await supabase
+    .from('cv_versions')
+    .select('id')
+    .eq('id', versionId)
+    .eq('cv_id', cvId)
+    .single()
+
+  if (versionError || !version) return null
   
   const { data, error } = await supabase
     .from('cvs')

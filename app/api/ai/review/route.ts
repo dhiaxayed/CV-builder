@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     }
 
     const heuristicReport = runATSChecks(cvData)
-    const review = await generateAtsReview({ cvData, userId: user.id })
+    const { review, source } = await generateAtsReview({ cvData, userId: user.id })
 
     if (cvId) {
       await updateCVATSScore(cvId, review.atsReadinessScore)
@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       review,
       heuristicReport,
+      source,
     })
   } catch (error) {
     console.error('[AI Review] Error generating AI review:', error)

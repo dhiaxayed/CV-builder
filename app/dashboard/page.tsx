@@ -130,7 +130,11 @@ export default function DashboardPage() {
     setIsDuplicating(true)
     
     try {
-      const response = await fetch(`/api/cvs/${selectedCV.id}/duplicate`, { method: 'POST' })
+      const response = await fetch(`/api/cvs/${selectedCV.id}/duplicate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: duplicateTitle.trim() }),
+      })
       const payload = await response.json().catch(() => null)
 
       if (response.ok) {

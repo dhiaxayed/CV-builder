@@ -2,39 +2,82 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { getSessionUser, updateUser } from '@/lib/db/users'
 import { updateCVPhoto, getCV, getCVWithCurrentVersion, updateCVData } from '@/lib/db/cvs'
+import { supabase } from '@/lib/db'
 import { CVData } from '@/lib/types/cv'
 import { nanoid } from 'nanoid'
+import sharp from 'sharp'
 
 // Configuration
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
-const VALID_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+const VALID_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 const MAX_DIMENSION = 1024 // Max width/height for resizing
 
-// Simple image processing (resizing via canvas would require a library in production)
-// For now, we'll just validate and store
-async function processImage(file: File): Promise<{ dataUrl: string; width?: number; height?: number }> {
+async function processImage(file: File): Promise<{
+  dataUrl: string
+  width?: number
+  height?: number
+  mimeType: string
+  size: number
+}> {
   const buffer = await file.arrayBuffer()
-  const base64 = Buffer.from(buffer).toString('base64')
-  const dataUrl = `data:${file.type};base64,${base64}`
-  
-  // In production, you'd use sharp or similar for:
-  // - Resizing to max dimensions
-  // - Optimizing quality
-  // - Converting to webp
-  // - Stripping EXIF data for privacy
-  
-  return { dataUrl }
+  const optimized = await sharp(Buffer.from(buffer), { animated: false })
+    .rotate()
+    .resize({
+      width: MAX_DIMENSION,
+      height: MAX_DIMENSION,
+      fit: 'inside',
+      withoutEnlargement: true,
+    })
+    .webp({ quality: 82 })
+    .toBuffer()
+
+  const metadata = await sharp(optimized).metadata()
+  const dataUrl = `data:image/webp;base64,${optimized.toString('base64')}`
+
+  return {
+    dataUrl,
+    width: metadata.width,
+    height: metadata.height,
+    mimeType: 'image/webp',
+    size: optimized.length,
+  }
 }
 
-// Store file metadata in database
 async function storeFileRecord(
   userId: string,
-  file: File,
-  storageUrl: string
+  fileName: string,
+  originalFile: File,
+  processed: Awaited<ReturnType<typeof processImage>>
 ): Promise<{ id: string }> {
-  // This would insert into uploaded_files table
-  // For now, we return a generated ID
-  return { id: nanoid() }
+  if (!supabase) {
+    throw new Error('Database not configured')
+  }
+
+  const id = nanoid()
+  const { error } = await supabase.from('uploaded_files').insert({
+    id,
+    user_id: userId,
+    file_type: 'photo',
+    file_name: fileName,
+    file_size: processed.size,
+    mime_type: processed.mimeType,
+    storage_url: processed.dataUrl,
+    storage_provider: 'base64',
+    metadata: {
+      originalName: originalFile.name,
+      originalType: originalFile.type,
+      originalSize: originalFile.size,
+      width: processed.width,
+      height: processed.height,
+      optimized: true,
+    },
+  })
+
+  if (error) {
+    throw new Error(`Failed to store uploaded file metadata: ${error.message}`)
+  }
+
+  return { id }
 }
 
 export async function POST(request: NextRequest) {
@@ -66,7 +109,7 @@ export async function POST(request: NextRequest) {
     if (!VALID_TYPES.includes(file.type)) {
       return NextResponse.json({ 
         error: 'Invalid file type',
-        message: 'Please upload a JPEG, PNG, WebP, or GIF image.',
+        message: 'Please upload a JPEG, PNG, or WebP image.',
         allowedTypes: VALID_TYPES
       }, { status: 400 })
     }
@@ -84,10 +127,11 @@ export async function POST(request: NextRequest) {
     const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
     
     // Process the image
-    const { dataUrl } = await processImage(file)
+    const processed = await processImage(file)
+    const { dataUrl } = processed
     
     // Store file record
-    const fileRecord = await storeFileRecord(user.id, file, dataUrl)
+    const fileRecord = await storeFileRecord(user.id, sanitizedName, file, processed)
     
     // Update the appropriate record
     if (target === 'profile') {
@@ -126,8 +170,10 @@ export async function POST(request: NextRequest) {
       fileId: fileRecord.id,
       url: dataUrl,
       fileName: sanitizedName,
-      fileSize: file.size,
-      mimeType: file.type,
+      fileSize: processed.size,
+      mimeType: processed.mimeType,
+      width: processed.width,
+      height: processed.height,
       message: 'Photo uploaded successfully'
     })
   } catch (error) {
@@ -165,6 +211,19 @@ export async function DELETE(request: NextRequest) {
       }
 
       await updateCVPhoto(cvId, null)
+
+      const cvWithVersion = await getCVWithCurrentVersion(cvId)
+      if (cvWithVersion?.current_version?.data) {
+        const currentData = cvWithVersion.current_version.data
+        const updatedData: CVData = {
+          ...currentData,
+          basics: {
+            ...currentData.basics,
+            photoUrl: undefined,
+          },
+        }
+        await updateCVData(cvId, updatedData)
+      }
     }
     
     return NextResponse.json({ 

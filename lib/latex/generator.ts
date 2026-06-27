@@ -1664,8 +1664,8 @@ export function generateBoldTemplate(data: CVData): string {
 
   const experienceSection = data.experience.length > 0 ? data.experience.map(exp => {
     const dateRange = exp.current 
-      ? `${formatDate(exp.startDate)} — PRESENT`
-      : `${formatDate(exp.startDate)} — ${formatDate(exp.endDate)}`
+      ? `${formatDate(exp.startDate)} -- PRESENT`
+      : `${formatDate(exp.startDate)} -- ${formatDate(exp.endDate)}`
     const bullets = safeArray(exp.bullets).filter(b => b.trim()).map(b => `    \\item ${escapeLatex(b)}`).join('\n')
     const tech = exp.technologies?.length 
       ? `\\\\[4pt]\\fcolorbox{black}{lightgray}{\\small ${escapeLatex(exp.technologies.join(' | '))}}`

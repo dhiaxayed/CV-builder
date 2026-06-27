@@ -39,12 +39,15 @@ export async function POST(
       }
     }
     
+    const { title } = await request.json().catch(() => ({}))
+    const newTitle = typeof title === 'string' && title.trim() ? title.trim() : undefined
+
     const cv = await getCV(id)
     if (!cv || cv.user_id !== user.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
     
-    const newCV = await duplicateCV(id, user.id)
+    const newCV = await duplicateCV(id, user.id, newTitle)
     
     return NextResponse.json({ cv: newCV })
   } catch (error) {
