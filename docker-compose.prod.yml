@@ -11,6 +11,7 @@ services:
       NODE_ENV: production
       LATEX_CMD: ${LATEX_CMD:-xelatex}
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+      TRUST_PROXY_HEADERS: '1'
     expose:
       - "3000"
     healthcheck:

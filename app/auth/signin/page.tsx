@@ -3,6 +3,7 @@
 import React from "react"
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { safeRedirect } from '@/lib/auth-redirect'
 import { useAuth } from '@/lib/auth-context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -49,7 +50,7 @@ export default function SignInPage() {
       const response = await fetch('/api/auth/send-magic-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, redirect: safeRedirect(new URLSearchParams(window.location.search).get('redirect')) }),
       })
       
       const data = await response.json()
@@ -81,7 +82,7 @@ export default function SignInPage() {
       const response = await fetch('/api/auth/send-magic-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: sentToEmail }),
+        body: JSON.stringify({ email: sentToEmail, redirect: safeRedirect(new URLSearchParams(window.location.search).get('redirect')) }),
       })
       
       const data = await response.json()
@@ -181,7 +182,7 @@ export default function SignInPage() {
                   </div>
                   <CardTitle className="text-2xl text-green-700">Check Your Inbox!</CardTitle>
                   <CardDescription className="text-base mt-2">
-                    We've sent a magic link to
+                    We&apos;ve sent a magic link to
                   </CardDescription>
                   <p className="font-semibold text-foreground mt-1">{sentToEmail}</p>
                 </>
@@ -205,6 +206,7 @@ export default function SignInPage() {
               {emailSent ? (
                 /* Email sent success view */
                 <div className="space-y-6">
+                  {devLink && <Button asChild><a href={devLink}>Open development sign-in link</a></Button>}
                   {/* Instructions */}
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
                     <div className="flex items-start gap-3">
@@ -216,7 +218,7 @@ export default function SignInPage() {
                         <ol className="text-sm text-blue-800 mt-2 space-y-2 list-decimal list-inside">
                           <li>Open your email inbox</li>
                           <li>Look for an email from <strong>CV Builder</strong></li>
-                          <li>Click the <strong>"Sign In"</strong> button in the email</li>
+                          <li>Click the <strong>&quot;Sign In&quot;</strong> button in the email</li>
                         </ol>
                       </div>
                     </div>
@@ -224,7 +226,7 @@ export default function SignInPage() {
 
                   {/* Tips */}
                   <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                    <h4 className="font-semibold text-amber-900 text-sm mb-2">💡 Can't find the email?</h4>
+                    <h4 className="font-semibold text-amber-900 text-sm mb-2">💡 Can&apos;t find the email?</h4>
                     <ul className="text-sm text-amber-800 space-y-1">
                       <li>• Check your <strong>spam</strong> or <strong>junk</strong> folder</li>
                       <li>• Make sure you entered the correct email</li>

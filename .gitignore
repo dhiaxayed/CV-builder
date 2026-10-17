@@ -32,3 +32,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Generated PDF QA artifacts (published thumbnails are intentionally tracked)
+/output/
+/tmp/
+/test_output_audit.json
+/vendor/tectonic-linux-x64/
+/vendor/tectonic-win32-x64/
+/vendor/tectonic-cache/

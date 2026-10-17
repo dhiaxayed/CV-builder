@@ -1,148 +1,36 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
-import { getSessionUser } from '@/lib/db/users'
-import { getCV, getCVWithCurrentVersion, updateCVData, deleteCV, updateCVTitle, updateCVTemplate } from '@/lib/db/cvs'
+import { NextResponse } from 'next/server'
+import { getCVWithCurrentVersion, updateCVData, deleteCV } from '@/lib/db/cvs'
+import { requireUser, readJSON, apiError, assertSameOrigin } from '@/lib/server/api'
+import { updateCVSchema } from '@/lib/validation/cv'
+import { AppError } from '@/lib/errors'
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+type Context = { params: Promise<{ id: string }> }
+
+export async function GET(_request: Request, { params }: Context) {
   try {
+    const user = await requireUser()
     const { id } = await params
-    const cookieStore = await cookies()
-    const sessionToken = cookieStore.get('session')?.value
-    
-    if (!sessionToken) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    
-    const user = await getSessionUser(sessionToken)
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    
-    const cv = await getCVWithCurrentVersion(id)
-    
-    if (!cv) {
-      return NextResponse.json({ error: 'CV not found' }, { status: 404 })
-    }
-    
-    if (cv.user_id !== user.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
-    }
-    
-    // Include data from current version
-    // Merge photo_url from CV table if exists but not in data (backward compatibility)
-    let cvData = cv.current_version?.data || null
-    if (cvData && (cv as any).photo_url && !cvData.basics?.photoUrl) {
-      cvData = {
-        ...cvData,
-        basics: {
-          ...cvData.basics,
-          photoUrl: (cv as any).photo_url,
-        },
-      }
-    }
-    
-    const cvWithData = {
-      ...cv,
-      data: cvData,
-    }
-    
-    return NextResponse.json(
-      { cv: cvWithData },
-      {
-        headers: {
-          'Cache-Control': 'no-store',
-        },
-      }
-    )
-  } catch (error) {
-    console.error('Error getting CV:', error)
-    return NextResponse.json({ error: 'Failed to get CV' }, { status: 500 })
-  }
+    const cv = await getCVWithCurrentVersion(id, user.id)
+    if (!cv) throw new AppError(404, 'CV_NOT_FOUND', 'CV not found')
+    return NextResponse.json({ cv: { ...cv, data: cv.draft_data } }, { headers: { 'Cache-Control': 'no-store' } })
+  } catch (error) { return apiError(error) }
 }
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PUT(request: Request, { params }: Context) {
   try {
+    const user = await requireUser()
     const { id } = await params
-    const cookieStore = await cookies()
-    const sessionToken = cookieStore.get('session')?.value
-    
-    if (!sessionToken) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    
-    const user = await getSessionUser(sessionToken)
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    
-    const cv = await getCV(id)
-    if (!cv || cv.user_id !== user.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
-    }
-    
-    const { data, title, templateId } = await request.json()
-    
-    if (title) {
-      await updateCVTitle(id, title)
-    }
-    
-    if (templateId) {
-      await updateCVTemplate(id, templateId)
-    }
-    
-    if (data) {
-      const version = await updateCVData(id, data)
-      return NextResponse.json(
-        { version },
-        {
-          headers: {
-            'Cache-Control': 'no-store',
-          },
-        }
-      )
-    }
-    
-    return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Error updating CV:', error)
-    return NextResponse.json({ error: 'Failed to update CV' }, { status: 500 })
-  }
+    const { expectedRevision, ...updates } = await readJSON(request, updateCVSchema)
+    const cv = await updateCVData(id, user.id, expectedRevision, updates)
+    return NextResponse.json({ revision: cv.revision, updatedAt: cv.updated_at }, { headers: { 'Cache-Control': 'no-store' } })
+  } catch (error) { return apiError(error) }
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function DELETE(request: Request, { params }: Context) {
   try {
-    const { id } = await params
-    const cookieStore = await cookies()
-    const sessionToken = cookieStore.get('session')?.value
-    
-    if (!sessionToken) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    
-    const user = await getSessionUser(sessionToken)
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    
-    const cv = await getCV(id)
-    if (!cv || cv.user_id !== user.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
-    }
-    
-    await deleteCV(id)
-    
+    assertSameOrigin(request)
+    const user = await requireUser()
+    await deleteCV((await params).id, user.id)
     return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Error deleting CV:', error)
-    return NextResponse.json({ error: 'Failed to delete CV' }, { status: 500 })
-  }
+  } catch (error) { return apiError(error) }
 }

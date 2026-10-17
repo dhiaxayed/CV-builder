@@ -1,159 +1,18 @@
-// Canonical JSON schema for resume content
+import type { z } from 'zod'
+import type { cvDataSchema } from '@/lib/validation/cv'
 
-export interface ContactInfo {
-  email: string
-  phone: string
-  location: string
-  linkedin?: string
-  github?: string
-  website?: string
-}
-
-export interface Basics {
-  name: string
-  title: string
-  contact: ContactInfo
-  photoUrl?: string
-}
-
-export interface ExperienceItem {
-  id: string
-  company: string
-  role: string
-  location: string
-  startDate: string
-  endDate: string
-  current: boolean
-  bullets: string[]
-  technologies?: string[]
-}
-
-export interface EducationItem {
-  id: string
-  institution: string
-  degree: string
-  field: string
-  location: string
-  startDate: string
-  endDate: string
-  gpa?: string
-  highlights?: string[]
-}
-
-export interface ProjectItem {
-  id: string
-  name: string
-  description: string
-  url?: string
-  technologies: string[]
-  bullets: string[]
-  startDate?: string
-  endDate?: string
-}
-
-export interface SkillGroup {
-  id: string
-  category: string
-  skills: string[]
-}
-
-export interface CertificationItem {
-  id: string
-  name: string
-  issuer: string
-  date: string
-  url?: string
-  expirationDate?: string
-}
-
-export interface AwardItem {
-  id: string
-  title: string
-  issuer: string
-  date: string
-  description?: string
-}
-
-export interface LanguageItem {
-  id: string
-  language: string
-  proficiency: 'Native' | 'Fluent' | 'Advanced' | 'Intermediate' | 'Basic'
-}
-
-export interface CustomSection {
-  id: string
-  title: string
-  type: 'bullets' | 'markdown'
-  content: string[]
-}
-
-export interface CVData {
-  basics: Basics
-  summary: string
-  experience: ExperienceItem[]
-  education: EducationItem[]
-  projects: ProjectItem[]
-  skills: SkillGroup[]
-  certifications: CertificationItem[]
-  awards: AwardItem[]
-  languages: LanguageItem[]
-  customSections: CustomSection[]
-}
-
-export interface CVVersion {
-  id: string
-  cvId: string
-  version: number
-  data: CVData
-  latexSource?: string
-  latexOverride?: string
-  createdAt: string
-  updatedAt: string
-  note?: string
-}
-
-export interface CV {
-  id: string
-  userId: string
-  title: string
-  templateId: string
-  currentVersionId: string
-  versions: CVVersion[]
-  isPublic: boolean
-  shareToken?: string
-  createdAt: string
-  updatedAt: string
-}
-
-export interface Template {
-  id: string
-  name: string
-  description: string
-  thumbnail: string
-  category: 'modern' | 'classic' | 'minimal'
-}
-
-export interface ShareLink {
-  id: string
-  cvId: string
-  versionId: string
-  token: string
-  isActive: boolean
-  expiresAt?: string
-  createdAt: string
-}
-
-export interface JobMatch {
-  id: string
-  cvId: string
-  jobDescription: string
-  extractedKeywords: string[]
-  matchedKeywords: string[]
-  missingKeywords: string[]
-  suggestions: string[]
-  score: number
-  createdAt: string
-}
+// Runtime validation and TypeScript share one CV contract.
+export type CVData = z.infer<typeof cvDataSchema>
+export type Basics = CVData['basics']
+export type ContactInfo = Basics['contact']
+export type ExperienceItem = CVData['experience'][number]
+export type EducationItem = CVData['education'][number]
+export type ProjectItem = CVData['projects'][number]
+export type SkillGroup = CVData['skills'][number]
+export type CertificationItem = CVData['certifications'][number]
+export type AwardItem = CVData['awards'][number]
+export type LanguageItem = CVData['languages'][number]
+export type CustomSection = CVData['customSections'][number]
 
 export interface ATSCheck {
   id: string
@@ -168,14 +27,6 @@ export interface ATSReport {
   checks: ATSCheck[]
   overallScore: number
   recommendations: string[]
-}
-
-// User type for local storage auth simulation
-export interface User {
-  id: string
-  email: string
-  name: string
-  createdAt: string
 }
 
 // Default empty CV data

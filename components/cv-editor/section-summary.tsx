@@ -23,7 +23,9 @@ export function SectionSummary({ data, onChange }: SectionSummaryProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
+        <Label htmlFor="cv-summary" className="sr-only">Professional Summary</Label>
         <Textarea
+          id="cv-summary"
           placeholder="Experienced professional with expertise in... Proven track record of..."
           value={data}
           onChange={(e) => onChange(e.target.value)}

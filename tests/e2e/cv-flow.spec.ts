@@ -1,153 +1,80 @@
-import { test, expect } from '@playwright/test';
-import { loginUser } from './utils';
+import sharp from 'sharp'
+import { test, expect } from '@playwright/test'
+import { loginUser, createCV } from './utils'
+import { renderFixture } from '../fixtures/render'
 
-test.describe('CV Creation Flow', () => {
-    test.describe.configure({ mode: 'serial' });
+test('editor saves sections and template, snapshots, restores, and preserves immutable V1',async ({ page }) => {
+  await loginUser(page,true)
+  const cv = await createCV(page.request,renderFixture(),'elegant')
+  await page.goto(`/cv/${cv.id}/edit`)
+  await page.getByRole('button',{ name:'Style',exact:true }).click()
+  await page.getByRole('button',{ name:'Burgundy theme',exact:true }).click()
+  await page.getByRole('combobox',{ name:'Typography',exact:true }).click()
+  await page.getByRole('option',{ name:'Modern sans serif',exact:true }).click()
+  await page.getByRole('button',{ name:'Close',exact:true }).click()
+  await expect(page.getByRole('heading',{ name:'Awards & Honors' })).toBeVisible()
+  const summary = page.getByLabel(/Professional Summary/i)
+  await summary.fill('Successfully delivered reliable services in order to improve performance by 40%.')
+  await page.getByRole('button',{ name:'Add award',exact:true }).click()
+  await page.getByLabel('Award title').last().fill('Engineering Prize')
+  await page.getByRole('button',{ name:'Add custom section' }).click()
+  await page.getByLabel('Section title').last().fill('Speaking')
+  await page.getByLabel('Content (one item or paragraph per line)').last().fill('Presented at a community conference.')
+  await expect(page.getByRole('status').filter({ hasText:'All changes saved' })).toBeVisible()
+  await page.reload()
+  await expect(summary).toHaveValue(/Successfully delivered/)
+  await expect(page.getByLabel('Award title').last()).toHaveValue('Engineering Prize')
+  await page.getByRole('button',{ name:'Version',exact:true }).click()
+  await page.getByLabel('Version Note (optional)').fill('Named snapshot')
+  await page.getByRole('button',{ name:'Save Version',exact:true }).click()
+  await expect(page.getByText('Version 2 saved').first()).toBeVisible()
+  const saved = (await (await page.request.get(`/api/cvs/${cv.id}`)).json()).cv
+  expect(saved.data.appearance).toEqual({ colorTheme:'burgundy',font:'sans' })
+  const restore = await page.request.put(`/api/cvs/${cv.id}/versions`,{ data:{ versionId:cv.current_version_id,expectedRevision:saved.revision } })
+  expect(restore.status()).toBe(200)
+  await summary.fill('New edits after a remote restore')
+  await expect(page.getByRole('status').filter({ hasText:'Conflicting modification' })).toBeVisible()
+  await expect(summary).toHaveValue('New edits after a remote restore')
+  await expect(page.getByRole('button',{ name:'Download local copy' })).toBeVisible()
+  const history = (await (await page.request.get(`/api/cvs/${cv.id}/versions`)).json()).cv.versions
+  expect(history.find((version:{ version:number }) => version.version === 1).data.summary).toBe(renderFixture().summary)
+  expect(history.find((version:{ version:number }) => version.version === 2).data.summary).toContain('Successfully delivered')
+  expect(history.find((version:{ version:number }) => version.version === 2).data.appearance).toEqual({ colorTheme:'burgundy',font:'sans' })
+})
 
-    test.beforeEach(async ({ page }) => {
-        await loginUser(page);
-    });
-
-    test('should create a new CV from sample data', async ({ page }) => {
-        // 1. Click Create New CV
-        await page.getByRole('button', { name: /Create New CV/i }).first().click();
-        await expect(page).toHaveURL('/cv/new');
-
-        // 2. Step 1: Choose Start Option (Sample)
-        await page.click('label[for="sample"]');
-        await page.click('button:has-text("Continue")');
-
-        // 3. Step 2: Choose Template (Modern default)
-        // Just click continue as modern is selected by default usually, or select it explicitly
-        await page.click('label[for="modern"]');
-        await page.click('button:has-text("Continue")');
-
-        // 4. Step 3: Enter Title
-        const cvTitle = `Test CV ${Date.now()}`;
-        await page.fill('input[id="cv-title"]', cvTitle);
-        const createResponsePromise = page.waitForResponse(response =>
-            response.url().includes('/api/cvs') &&
-            response.request().method() === 'POST' &&
-            response.status() === 200
-        );
-        await page.click('button:has-text("Create CV")');
-        await createResponsePromise;
-
-        // 5. Verify redirection to edit page
-        await expect(page).toHaveURL(/\/cv\/.*\/edit/, { timeout: 30000 });
-
-        // 6. Verify title exists in the edit page (assuming it's shown in header or input)
-        // We might need to check if the API call succeeded or if elements are visible
-        // Let's assume there is some text indicating the CV is loaded
-        await expect(page.locator('body')).toContainText('Basic Information'); // Common CV section
-
-        await page.goto('/cv/new');
-        await expect(page.getByText(/Free plan limit reached/i).first()).toBeVisible();
-    });
-
-    test('should guide the user through AI review, tailoring, versioning, and export pages', async ({ page }) => {
-        test.setTimeout(300000);
-
-        await page.getByRole('button', { name: /Create.*CV/i }).first().click();
-        await expect(page).toHaveURL('/cv/new');
-
-        await page.click('label[for="sample"]');
-        await page.click('button:has-text("Continue")');
-        await page.click('label[for="modern"]');
-        await page.click('button:has-text("Continue")');
-
-        const cvTitle = `AI Flow CV ${Date.now()}`;
-        await page.fill('input[id="cv-title"]', cvTitle);
-        const createResponsePromise = page.waitForResponse(response =>
-            response.url().includes('/api/cvs') &&
-            response.request().method() === 'POST' &&
-            response.status() === 200
-        );
-        await page.click('button:has-text("Create CV")');
-        await createResponsePromise;
-        await expect(page).toHaveURL(/\/cv\/.*\/edit/, { timeout: 30000 });
-
-        await expect(page.getByText(/Use Preview to inspect layout/i)).toBeVisible();
-        await expect(page.getByText(/All changes saved|Unsaved changes|Saving changes/i)).toBeVisible();
-
-        const pngPhoto = Buffer.from(
-            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=',
-            'base64'
-        );
-        await page.locator('input[type="file"]').setInputFiles({
-            name: 'profile-photo.png',
-            mimeType: 'image/png',
-            buffer: pngPhoto,
-        });
-        await expect(page.getByText(/Photo uploaded successfully/i).first()).toBeVisible({ timeout: 30000 });
-        await expect(page.locator('img[alt="Alex Johnson"]')).toBeVisible();
-
-        await page.getByRole('tab', { name: /AI Assist/i }).click();
-        await expect(page.getByText('AI Career Assistant')).toBeVisible();
-        await expect(page.getByText(/How to use this assistant/i)).toBeVisible();
-
-        await page.getByRole('button', { name: /Run AI ATS Review/i }).click();
-
-        const aiSnapshot = page.getByText('AI Snapshot');
-        const aiReviewFailed = page.getByText('AI review failed');
-
-        const reviewOutcome = await Promise.race([
-            aiSnapshot.waitFor({ state: 'visible', timeout: 120000 }).then(() => 'ready' as const),
-            aiReviewFailed.waitFor({ state: 'visible', timeout: 120000 }).then(() => 'failed' as const),
-        ]);
-
-        if (reviewOutcome === 'failed') {
-            await expect(aiReviewFailed).toBeVisible();
-        }
-
-        await page.getByLabel('Target Job Title').fill('Senior Full Stack Engineer');
-        await page.getByLabel('Company Name').fill('Acme');
-        await page.getByLabel('Job Description').fill(
-            'We are hiring a Senior Full Stack Engineer to build scalable web applications with React, TypeScript, Node.js, PostgreSQL, APIs, testing, CI/CD, cloud infrastructure, collaboration, and product thinking.'
-        );
-        const tailorButton = page.getByRole('button', { name: /Tailor CV for This Role/i });
-        const tailoredSummary = page.getByText('Tailored Summary');
-
-        if (await tailorButton.isDisabled()) {
-            await expect(page.getByText(/Pro feature|Pro plan only/i).first()).toBeVisible();
-        } else {
-            await tailorButton.click();
-            await tailoredSummary.waitFor({ state: 'visible', timeout: 180000 });
-            await page.getByRole('button', { name: /Apply Full Package/i }).click();
-            await expect(page.getByText(/Unsaved changes/i)).toBeVisible();
-        }
-
-        await page.getByRole('button', { name: /^Version$/i }).click();
-        await expect(page.getByText('Save as New Version')).toBeVisible();
-        await page.getByLabel('Version Note (optional)').fill('Playwright AI snapshot');
-        await page.getByRole('button', { name: /Save Version/i }).click();
-        await expect(page.locator('span').filter({ hasText: /Version \d+ saved/i }).first()).toBeVisible({ timeout: 120000 });
-
-        const cvId = page.url().match(/\/cv\/([^/]+)\/edit/)?.[1];
-        expect(cvId).toBeTruthy();
-
-        await page.goto(`/cv/${cvId}/versions`);
-        await expect(page.getByRole('heading', { name: 'Version History' })).toBeVisible();
-
-        await page.goto(`/cv/${cvId}/export`);
-        await expect(page.getByRole('heading', { name: 'Export & Share' })).toBeVisible();
-        await expect(page.getByText(/PDF Export/i).first()).toBeVisible();
-
-        const downloadButtons = page.getByRole('button', { name: /^Download$/i });
-
-        const pdfDownloadPromise = page.waitForEvent('download', { timeout: 120000 });
-        await downloadButtons.nth(0).click();
-        const pdfDownload = await pdfDownloadPromise;
-        expect(pdfDownload.suggestedFilename()).toMatch(/\.pdf$/);
-
-        const latexDownloadPromise = page.waitForEvent('download', { timeout: 60000 });
-        await downloadButtons.nth(1).click();
-        const latexDownload = await latexDownloadPromise;
-        expect(latexDownload.suggestedFilename()).toMatch(/\.tex$/);
-
-        const jsonDownloadPromise = page.waitForEvent('download', { timeout: 60000 });
-        await downloadButtons.nth(2).click();
-        const jsonDownload = await jsonDownloadPromise;
-        expect(jsonDownload.suggestedFilename()).toMatch(/\.json$/);
-    });
-});
+test('AI fallback, selective application, undo, photo persistence and real PDF export',async ({ page }) => {
+  test.setTimeout(180000)
+  await loginUser(page,true)
+  const data = renderFixture()
+  data.summary = 'Successfully built reliable applications in order to improve service performance by 40%.'
+  const cv = await createCV(page.request,data)
+  await page.goto(`/cv/${cv.id}/edit`)
+  await page.getByRole('tab',{ name:/AI Assist/i }).click()
+  await page.getByRole('button',{ name:'Run AI ATS Review' }).click()
+  await expect(page.getByText(/AI was unavailable, so this review/i)).toBeVisible()
+  await page.getByRole('button',{ name:'Suggest shorter content' }).click()
+  await expect(page.getByText(/Local wording suggestions: Local wording/i)).toBeVisible()
+  await page.getByRole('button',{ name:'Apply shorter summary' }).click()
+  await page.getByRole('button',{ name:'Undo AI change' }).click()
+  await expect(page.getByLabel(/Professional Summary/i)).toHaveValue(data.summary)
+  await expect(page.getByRole('status').filter({ hasText:'All changes saved' })).toBeVisible()
+  const photo = await sharp({ create:{ width:64,height:64,channels:3,background:'#456789' } }).png().toBuffer()
+  const uploaded = page.waitForResponse(response => response.url().includes('/api/upload/photo'))
+  await page.locator('input[type="file"]').setInputFiles({ name:'photo.png',mimeType:'image/png',buffer:photo })
+  const uploadResponse = await uploaded
+  expect(uploadResponse.status(),await uploadResponse.text()).toBe(200)
+  await expect(page.getByText(/Photo uploaded successfully/i).first()).toBeVisible()
+  await expect(page.getByRole('status').filter({ hasText:'All changes saved' })).toBeVisible()
+  const persisted = (await (await page.request.get(`/api/cvs/${cv.id}`)).json()).cv
+  expect(persisted.data.basics.photoUrl).toMatch(/^\/api\/photos\//)
+  await page.goto(`/cv/${cv.id}/export`)
+  const downloads = page.getByRole('button',{ name:'Download',exact:true })
+  const pdfPending = page.waitForEvent('download')
+  await downloads.nth(0).click()
+  expect((await pdfPending).suggestedFilename()).toMatch(/\.pdf$/)
+  for (const [index,extension] of [[1,'tex'],[2,'json']] as const) {
+    const pending = page.waitForEvent('download')
+    await downloads.nth(index).click()
+    expect((await pending).suggestedFilename()).toMatch(new RegExp(`\\.${extension}$`))
+  }
+})

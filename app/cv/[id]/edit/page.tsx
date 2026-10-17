@@ -1,10 +1,15 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
-import { CVData } from '@/lib/types/cv'
-import { generateLatex } from '@/lib/latex/generator'
+import { CVData, createEmptyCVData } from '@/lib/types/cv'
+import { RevisionSaver, type SaveStatus } from '@/lib/autosave'
+import { TEMPLATES } from '@/lib/templates'
+import { SectionAwards } from '@/components/cv-editor/section-awards'
+import { SectionCustom } from '@/components/cv-editor/section-custom'
+import { AppearanceSettings } from '@/components/cv-editor/appearance-settings'
+import { generateLatex, type RenderDensity } from '@/lib/latex/generator'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -54,60 +59,14 @@ import { ATSPanel } from '@/components/cv-editor/ats-panel'
 import { JDMatchPanel } from '@/components/cv-editor/jd-match-panel'
 import { AIAssistantPanel } from '@/components/cv-editor/ai-assistant-panel'
 
-// Template definitions - 16 Professional Templates
-const TEMPLATES = [
-  // ATS-Friendly
-  { id: 'modern', name: 'Modern', desc: 'Clean & ATS-friendly', category: 'ATS-Friendly' },
-  { id: 'classic', name: 'Classic', desc: 'Traditional professional', category: 'ATS-Friendly' },
-  { id: 'minimal', name: 'Minimal', desc: 'Simple & elegant', category: 'ATS-Friendly' },
-  { id: 'compact', name: 'Compact', desc: 'Ultra space-efficient', category: 'ATS-Friendly' },
-  // Professional
-  { id: 'professional', name: 'Professional', desc: 'Executive business', category: 'Professional' },
-  { id: 'executive', name: 'Executive', desc: 'C-level & senior', category: 'Professional' },
-  { id: 'banking', name: 'Banking', desc: 'Corporate & finance', category: 'Professional' },
-  { id: 'elegant', name: 'Elegant', desc: 'Premium sidebar design', category: 'Professional' },
-  // Creative
-  { id: 'creative', name: 'Creative', desc: 'Modern & visual', category: 'Creative' },
-  { id: 'fancy', name: 'Fancy', desc: 'Decorative & stylish', category: 'Creative' },
-  { id: 'bold', name: 'Bold', desc: 'High contrast statement', category: 'Creative' },
-  { id: 'infographic', name: 'Infographic', desc: 'Visual with skill bars', category: 'Creative' },
-  // Specialized
-  { id: 'tech', name: 'Tech', desc: 'Developer focused', category: 'Specialized' },
-  { id: 'academic', name: 'Academic', desc: 'Research & education', category: 'Specialized' },
-  { id: 'casual', name: 'Casual', desc: 'Friendly & approachable', category: 'Specialized' },
-  { id: 'vintage', name: 'Vintage', desc: 'Traditional elegance', category: 'Specialized' },
-]
-
-// Default CV data structure
-const DEFAULT_CV_DATA: CVData = {
-  basics: {
-    name: '',
-    title: '',
-    contact: {
-      email: '',
-      phone: '',
-      location: '',
-      linkedin: '',
-      github: '',
-      website: '',
-    },
-  },
-  summary: '',
-  experience: [],
-  education: [],
-  skills: [],
-  projects: [],
-  certifications: [],
-  languages: [],
-  awards: [],
-  customSections: [],
-}
+const DEFAULT_CV_DATA = createEmptyCVData()
 
 interface DbCV {
   id: string
   user_id: string
   title: string
   template_id: string
+  revision: number
   current_version_id: string | null
   created_at: string
   updated_at: string
@@ -119,16 +78,18 @@ export default function CVEditorPage() {
   const { user, isLoading: authLoading } = useAuth()
   const { toast } = useToast()
   const router = useRouter()
-  
+
   const [cv, setCv] = useState<DbCV | null>(null)
   const [cvData, setCvData] = useState<CVData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [isSavingVersion, setIsSavingVersion] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [mobilePane, setMobilePane] = useState<'edit' | 'tools'>('edit')
   const [activeView, setActiveView] = useState<'form' | 'latex'>('form')
   const [rightPanel, setRightPanel] = useState<'preview' | 'ats' | 'jd' | 'ai'>('preview')
-  const [latexCode, setLatexCode] = useState('')
+  const [compiledLayout, setCompiledLayout] = useState<{ data:CVData; template:string; density:RenderDensity } | null>(null)
+  const latexCode = useMemo(() => cvData && cv ? generateLatex(cvData,cv.template_id,compiledLayout?.data === cvData && compiledLayout.template === cv.template_id ? compiledLayout.density : 'normal') : '',[cvData,cv,compiledLayout])
   const [saveVersionDialogOpen, setSaveVersionDialogOpen] = useState(false)
   const [versionNote, setVersionNote] = useState('')
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
@@ -136,26 +97,20 @@ export default function CVEditorPage() {
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null)
   const [isPdfPreviewLoading, setIsPdfPreviewLoading] = useState(false)
   const [pdfPreviewError, setPdfPreviewError] = useState<string | null>(null)
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const saverRef = useRef<RevisionSaver<{ data: CVData; templateId: string; title: string }> | null>(null)
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved')
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const dataRef = useRef<CVData | null>(null)
+  dataRef.current = cvData
+  const undoRef = useRef<Array<{ before: CVData; after: CVData }>>([])
+  const [canUndoAI, setCanUndoAI] = useState(false)
   const pdfPreviewUrlRef = useRef<string | null>(null)
-  
-  // Load CV data from database
-  useEffect(() => {
-    if (!authLoading && !user) {
-      router.push('/auth/signin')
-      return
-    }
-    
-    if (user && params.id) {
-      loadCV()
-    }
-  }, [authLoading, user, params.id])
-  
-  const loadCV = async () => {
+
+  const loadCV = useCallback(async () => {
     try {
       setIsLoading(true)
       const response = await fetch(`/api/cvs/${params.id}`, { cache: 'no-store' })
-      
+
       if (!response.ok) {
         if (response.status === 404 || response.status === 403) {
           router.push('/dashboard')
@@ -163,10 +118,28 @@ export default function CVEditorPage() {
         }
         throw new Error('Failed to load CV')
       }
-      
+
       const { cv: loadedCV } = await response.json()
+      const initial = loadedCV.data || DEFAULT_CV_DATA
+      saverRef.current = new RevisionSaver({ data: initial, templateId: loadedCV.template_id, title: loadedCV.title }, loadedCV.revision,
+        async (snapshot, expectedRevision) => {
+          const response = await fetch(`/api/cvs/${loadedCV.id}`, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...snapshot, expectedRevision }),
+            keepalive: JSON.stringify(snapshot).length < 60000,
+          })
+          const result = await response.json()
+          if (!response.ok) throw Object.assign(new Error(result.error || 'Save failed. Please retry.'), { status: response.status })
+          setLastSavedAt(new Date().toISOString())
+          return result.revision
+        }, status => {
+          setSaveStatus(status)
+          setIsSaving(status === 'saving')
+          setHasUnsavedChanges(Boolean(saverRef.current?.dirty))
+          setSaveError(saverRef.current?.error || null)
+        })
       setCv(loadedCV)
-      setCvData(loadedCV.data || DEFAULT_CV_DATA)
+      setCvData(initial)
       setLastSavedAt(loadedCV.updated_at || new Date().toISOString())
     } catch (error) {
       console.error('Error loading CV:', error)
@@ -175,15 +148,19 @@ export default function CVEditorPage() {
     } finally {
       setIsLoading(false)
     }
-  }
-  
-  // Generate LaTeX when data changes
+  }, [params.id, router, toast])
+
+  // Load CV data from database
   useEffect(() => {
-    if (cvData && cv) {
-      const latex = generateLatex(cvData, cv.template_id)
-      setLatexCode(latex)
+    if (!authLoading && !user) {
+      router.push('/auth/signin')
+      return
     }
-  }, [cvData, cv])
+
+    if (user && params.id) {
+      loadCV()
+    }
+  }, [authLoading, user, params.id, loadCV, router])
 
   useEffect(() => {
     return () => {
@@ -197,6 +174,9 @@ export default function CVEditorPage() {
     if (rightPanel !== 'preview' || !cvData || !cv) return
 
     const controller = new AbortController()
+    setPdfPreviewUrl(null)
+    setPdfPreviewError(null)
+    setIsPdfPreviewLoading(true)
     const timeout = window.setTimeout(async () => {
       setIsPdfPreviewLoading(true)
       setPdfPreviewError(null)
@@ -212,6 +192,7 @@ export default function CVEditorPage() {
             templateId: cv.template_id,
             title: cv.title,
             format: 'pdf',
+            intent: 'preview',
           }),
         })
 
@@ -221,6 +202,7 @@ export default function CVEditorPage() {
         }
 
         const blob = await response.blob()
+        if (controller.signal.aborted) return
         const nextUrl = URL.createObjectURL(blob)
 
         if (pdfPreviewUrlRef.current) {
@@ -229,8 +211,10 @@ export default function CVEditorPage() {
 
         pdfPreviewUrlRef.current = nextUrl
         setPdfPreviewUrl(nextUrl)
+        const density = response.headers.get('X-CV-PDF-Density')
+        if (density === 'normal' || density === 'compact' || density === 'dense') setCompiledLayout({ data:cvData,template:cv.template_id,density })
       } catch (error) {
-        if (error instanceof DOMException && error.name === 'AbortError') return
+        if (controller.signal.aborted) return
         setPdfPreviewError(error instanceof Error ? error.message : 'Failed to compile LaTeX PDF preview')
       } finally {
         if (!controller.signal.aborted) {
@@ -244,68 +228,80 @@ export default function CVEditorPage() {
       controller.abort()
     }
   }, [rightPanel, cvData, cv])
-  
-  // Auto-save with debounce
+
+  // All content and template changes enter one queue, including photo and AI edits.
   useEffect(() => {
-    if (hasUnsavedChanges && cv && cvData) {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current)
-      }
-      
-      saveTimeoutRef.current = setTimeout(() => {
-        saveChanges()
-      }, 2000) // Auto-save after 2 seconds of inactivity
+    const saver = saverRef.current
+    if (!saver || !cvData || !cv) return
+    if (saver.value.data !== cvData || saver.value.templateId !== cv.template_id || saver.value.title !== cv.title) {
+      saver.change({ data: cvData, templateId: cv.template_id, title: cv.title })
     }
-    
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current)
-      }
+    if (!saver.dirty || saver.status === 'conflict') return
+    const timer = window.setTimeout(() => { void saver.flush().catch(() => {}) }, 1200)
+    return () => window.clearTimeout(timer)
+  }, [cvData, cv])
+
+  useEffect(() => {
+    const warn = (event: BeforeUnloadEvent) => {
+      if (saverRef.current?.dirty) { event.preventDefault(); event.returnValue = '' }
     }
-  }, [hasUnsavedChanges, cvData])
-  
-  // Save changes to database
+    const recover = () => { void saverRef.current?.flush().catch(() => {}) }
+    window.addEventListener('beforeunload', warn)
+    window.addEventListener('online', recover)
+    return () => { window.removeEventListener('beforeunload', warn); window.removeEventListener('online', recover); void saverRef.current?.flush().catch(() => {}) }
+  }, [])
+
   const saveChanges = useCallback(async () => {
-    if (!cv || !cvData) return
-    
-    setIsSaving(true)
-    try {
-      const response = await fetch(`/api/cvs/${cv.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        cache: 'no-store',
-        body: JSON.stringify({ data: cvData }),
-      })
-      
-      if (!response.ok) throw new Error('Failed to save')
-      
-      setHasUnsavedChanges(false)
-      setLastSavedAt(new Date().toISOString())
-      toast({ title: 'Changes saved' })
-      return true
-    } catch {
-      toast({ title: 'Failed to save changes', variant: 'destructive' })
+    try { await saverRef.current?.flush(); return true } catch (error) {
+      toast({ title: error instanceof Error ? error.message : 'Save failed. Please retry.', variant: 'destructive' })
       return false
-    } finally {
-      setIsSaving(false)
     }
-  }, [cv, cvData, toast])
-  
+  }, [toast])
+
+  const navigateSaved = async (url: string) => {
+    if (await saveChanges()) router.push(url)
+  }
+
+  const commitAI = (update: (current: CVData) => CVData) => {
+    const before = dataRef.current
+    if (!before) return
+    const after = update(before)
+    undoRef.current.push({ before, after })
+    if (undoRef.current.length > 10) undoRef.current.shift()
+    setCanUndoAI(true)
+    dataRef.current = after
+    setCvData(after)
+  }
+
+  const undoAI = () => {
+    const change = undoRef.current.pop()
+    const current = dataRef.current
+    if (!change || !current) return
+    const next = { ...current }
+    // Revert only unchanged AI fields; preserve subsequent manual edits.
+    for (const field of ['summary', 'skills', 'experience'] as const) {
+      if (JSON.stringify(current[field]) === JSON.stringify(change.after[field])) {
+        Object.assign(next, { [field]: change.before[field] })
+      }
+    }
+    setCvData(next)
+    setCanUndoAI(undoRef.current.length > 0)
+    toast({ title: 'AI changes undone; later manual edits preserved' })
+  }
+
   // Handle data changes
   const handleDataChange = (updates: Partial<CVData>) => {
     setCvData((current) => {
       if (!current) return current
       return { ...current, ...updates }
     })
-    setHasUnsavedChanges(true)
   }
 
   const applyAISummary = (summary: string) => {
-    setCvData((current) => {
+    commitAI((current) => {
       if (!current) return current
       return { ...current, summary }
     })
-    setHasUnsavedChanges(true)
     toast({ title: 'AI summary applied' })
   }
 
@@ -316,7 +312,7 @@ export default function CVEditorPage() {
 
     if (normalizedSkills.length === 0) return
 
-    setCvData((current) => {
+    commitAI((current) => {
       if (!current) return current
 
       const existingIndex = current.skills.findIndex((group) =>
@@ -347,7 +343,6 @@ export default function CVEditorPage() {
       }
     })
 
-    setHasUnsavedChanges(true)
     toast({ title: 'AI skills added' })
   }
 
@@ -356,7 +351,7 @@ export default function CVEditorPage() {
 
     if (cleanBullets.length === 0) return
 
-    setCvData((current) => {
+    commitAI((current) => {
       if (!current) return current
 
       return {
@@ -367,7 +362,6 @@ export default function CVEditorPage() {
       }
     })
 
-    setHasUnsavedChanges(true)
     toast({ title: 'AI bullets applied' })
   }
 
@@ -382,7 +376,7 @@ export default function CVEditorPage() {
   }) => {
     const normalizedSkills = Array.from(new Set(skills.map((skill) => skill.trim()).filter(Boolean)))
 
-    setCvData((current) => {
+    commitAI((current) => {
       if (!current) return current
 
       const rewriteMap = new Map(
@@ -425,39 +419,39 @@ export default function CVEditorPage() {
       }
     })
 
-    setHasUnsavedChanges(true)
     toast({ title: 'AI tailored package applied' })
   }
-  
+
   // Save as new version
   const handleSaveVersion = async () => {
     if (!cv || !cvData) return
 
     setIsSavingVersion(true)
     try {
-      const response = await fetch(`/api/cvs/${cv.id}/versions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: cvData, note: versionNote }),
+      const saver = saverRef.current
+      if (!saver) return
+      const version = await saver.exclusive(async (_snapshot, expectedRevision) => {
+        const response = await fetch(`/api/cvs/${cv.id}/versions`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ expectedRevision, note: versionNote }),
+        })
+        const result = await response.json()
+        if (!response.ok) throw Object.assign(new Error(result.error || 'Failed to save version'), { status: response.status })
+        return { result: result.version, revision: result.revision }
       })
-      
-      if (!response.ok) throw new Error('Failed to save version')
-      
-      const { version } = await response.json()
       toast({ title: `Version ${version.version} saved` })
       setSaveVersionDialogOpen(false)
       setVersionNote('')
-      setHasUnsavedChanges(false)
       setLastSavedAt(new Date().toISOString())
       setLastVersionSavedLabel(`Version ${version.version} saved`)
-    } catch {
-      toast({ title: 'Failed to save version', variant: 'destructive' })
+    } catch (error) {
+      toast({ title: error instanceof Error ? error.message : 'Failed to save version', variant: 'destructive' })
     } finally {
       setIsSavingVersion(false)
     }
   }
 
-  const saveStatusLabel = isSaving ? 'Saving changes...' : hasUnsavedChanges ? 'Unsaved changes' : 'All changes saved'
+  const saveStatusLabel = saveStatus === 'conflict' ? 'Conflicting modification' : saveStatus === 'failed' ? 'Save failed ? retry' : isSaving ? 'Saving changes...' : hasUnsavedChanges ? 'Unsaved changes' : 'All changes saved'
   const saveStatusTone = isSaving
     ? 'border-blue-200 bg-blue-50 text-blue-700'
     : hasUnsavedChanges
@@ -466,32 +460,31 @@ export default function CVEditorPage() {
   const formattedSavedTime = lastSavedAt
     ? new Date(lastSavedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
     : null
-  
-  // Handle template change
-  const handleTemplateChange = async (templateId: string) => {
-    if (!cv) return
-    
-    try {
-      // Update local state immediately for responsiveness
-      setCv({ ...cv, template_id: templateId })
-      
-      // Save to database
-      const response = await fetch(`/api/cvs/${cv.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ templateId }),
-      })
 
-      if (!response.ok) {
-        throw new Error('Failed to change template')
-      }
-      
-      toast({ title: 'Template changed' })
-    } catch {
-      toast({ title: 'Failed to change template', variant: 'destructive' })
-    }
+  // Handle template change
+  const handleTemplateChange = (templateId: string) => {
+    setCv(current => current ? { ...current, template_id: templateId } : current)
   }
-  
+
+  const handlePhotoUpload = async (file: File) => {
+    const saver = saverRef.current
+    if (!saver || !cv) return
+    await saver.exclusive(async (_snapshot, expectedRevision) => {
+      const form = new FormData()
+      form.set('photo', file); form.set('target', 'cv'); form.set('cvId', cv.id)
+      form.set('expectedRevision', String(expectedRevision))
+      const response = await fetch('/api/upload/photo', { method: 'POST', body: form })
+      const result = await response.json()
+      if (!response.ok) throw Object.assign(new Error(result.error || 'Photo upload failed'), { status: response.status })
+      const current = saver.value
+      const next = { ...current.data, basics: { ...current.data.basics, photoUrl: result.url } }
+      saver.change({ ...current, data: next })
+      dataRef.current = next
+      setCvData(next)
+      return { result: undefined, revision: result.revision }
+    })
+  }
+
   // Download LaTeX
   const handleDownloadLatex = () => {
     const blob = new Blob([latexCode], { type: 'text/plain' })
@@ -505,7 +498,7 @@ export default function CVEditorPage() {
     URL.revokeObjectURL(url)
     toast({ title: 'LaTeX file downloaded' })
   }
-  
+
   // Export to PDF (template-accurate LaTeX compilation)
   const handleExportPDF = async () => {
     try {
@@ -513,28 +506,27 @@ export default function CVEditorPage() {
         throw new Error('CV data is not loaded yet')
       }
 
-      if (hasUnsavedChanges) {
-        const saved = await saveChanges()
-        if (!saved) {
-          throw new Error('Save your latest changes before exporting the PDF')
-        }
+      const saved = await saveChanges()
+      if (!saved) {
+        throw new Error('Save your latest changes before exporting the PDF')
       }
 
+      const snapshot = saverRef.current?.value
       toast({ title: 'Generating PDF...' })
-      
+
       const response = await fetch('/api/pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         cache: 'no-store',
-        body: JSON.stringify({ 
-          cvData, 
+        body: JSON.stringify({
           cvId: cv?.id,
-          templateId: cv?.template_id,
+          expectedRevision: saverRef.current?.serverRevision,
+          templateId: snapshot?.templateId || cv?.template_id,
           title: cv?.title,
           format: 'pdf',
         }),
       })
-      
+
       if (!response.ok) {
         const error = await response.json().catch(() => ({}))
         throw new Error(error.message || 'Failed to generate PDF')
@@ -553,13 +545,13 @@ export default function CVEditorPage() {
 
       toast({ title: 'PDF downloaded from LaTeX' })
     } catch (error) {
-      toast({ 
-        title: error instanceof Error ? error.message : 'Failed to generate PDF', 
-        variant: 'destructive' 
+      toast({
+        title: error instanceof Error ? error.message : 'Failed to generate PDF',
+        variant: 'destructive'
       })
     }
   }
-  
+
   if (authLoading || isLoading) {
     return (
       <div className="min-h-screen bg-background">
@@ -580,32 +572,32 @@ export default function CVEditorPage() {
       </div>
     )
   }
-  
+
   if (!cv || !cvData) return null
-  
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <header className="border-b bg-card sticky top-0 z-20">
-        <div className="container mx-auto px-4 py-2 flex items-center justify-between">
+        <div className="container mx-auto px-4 py-2 flex flex-wrap gap-3 items-center justify-between">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => router.push('/dashboard')}>
+            <Button variant="ghost" size="icon" aria-label="Back to dashboard" onClick={() => navigateSaved('/dashboard')}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div className="flex flex-col">
               <div className="flex items-center gap-2">
                 <FileText className="h-5 w-5 text-primary" />
-                <span className="font-semibold">{cv.title}</span>
+                <Input aria-label="CV title" className="h-8 max-w-56 font-semibold" maxLength={255} value={cv.title} onChange={event => setCv(current => current ? { ...current, title: event.target.value } : current)} />
               </div>
-              <p className="text-xs text-muted-foreground">
+              <p className="hidden sm:block text-xs text-muted-foreground">
                 Use Preview to inspect layout, then open AI Assist for review, tailoring, and factual rewrites.
               </p>
             </div>
           </div>
-          
-          <div className="flex items-center gap-2">
+
+          <div className="flex flex-wrap items-center gap-2">
             <Select value={cv.template_id} onValueChange={handleTemplateChange}>
-              <SelectTrigger className="w-40 h-8">
+              <SelectTrigger aria-label="CV template" className="w-40 h-8">
                 <SelectValue placeholder="Template" />
               </SelectTrigger>
               <SelectContent>
@@ -619,11 +611,13 @@ export default function CVEditorPage() {
                 ))}
               </SelectContent>
             </Select>
-            
-            <Button 
-              variant="outline" 
+
+            <AppearanceSettings value={cvData.appearance} onChange={appearance => handleDataChange({ appearance })} />
+
+            <Button
+              variant="outline"
               size="sm"
-              onClick={saveChanges}
+              onClick={() => saveChanges()}
               disabled={!hasUnsavedChanges || isSaving}
             >
               {isSaving ? (
@@ -633,21 +627,21 @@ export default function CVEditorPage() {
               )}
               Save
             </Button>
-            
-            <Button 
-              variant="outline" 
+
+            <Button
+              variant="outline"
               size="sm"
               onClick={() => setSaveVersionDialogOpen(true)}
             >
               <History className="h-4 w-4 mr-1" />
               Version
             </Button>
-            
+
             <Button variant="outline" size="sm" onClick={handleDownloadLatex}>
               <Download className="h-4 w-4 mr-1" />
               .tex
             </Button>
-            
+
             <Button size="sm" onClick={handleExportPDF}>
               <Download className="h-4 w-4 mr-1" />
               PDF
@@ -658,9 +652,14 @@ export default function CVEditorPage() {
 
       <div className="border-b bg-muted/20">
         <div className="container mx-auto flex flex-wrap items-center gap-2 px-4 py-2 text-xs">
-          <span className={`rounded-full border px-2 py-1 font-medium ${saveStatusTone}`}>
+          <span role="status" aria-live="polite" className={`rounded-full border px-2 py-1 font-medium ${saveStatusTone}`}>
             {saveStatusLabel}
           </span>
+          {saveError && <span role="alert" className="text-destructive">{saveError} <Button size="sm" variant="outline" onClick={() => {
+            const blob = new Blob([JSON.stringify({ data: cvData, templateId: cv.template_id }, null, 2)], { type: 'application/json' })
+            const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'unsaved-cv.json'; a.click(); URL.revokeObjectURL(url)
+          }}>Download local copy</Button></span>}
+          {canUndoAI && <Button variant="outline" size="sm" onClick={undoAI}>Undo AI change</Button>}
           {formattedSavedTime && (
             <span className="text-muted-foreground">Last saved at {formattedSavedTime}</span>
           )}
@@ -669,16 +668,21 @@ export default function CVEditorPage() {
               {lastVersionSavedLabel}
             </span>
           )}
+          <span className="text-muted-foreground">{TEMPLATES.find(template => template.id === cv.template_id)?.atsNote}</span>
           <span className="text-muted-foreground">
             Tip: save a version after major AI changes so you can compare role-specific variants later.
           </span>
         </div>
       </div>
-      
+
+      <div className="flex gap-2 border-b p-2 lg:hidden" role="group" aria-label="Editor panels">
+        <Button variant={mobilePane === 'edit' ? 'default' : 'outline'} size="sm" aria-pressed={mobilePane === 'edit'} onClick={() => setMobilePane('edit')}>Edit CV</Button>
+        <Button variant={mobilePane === 'tools' ? 'default' : 'outline'} size="sm" aria-pressed={mobilePane === 'tools'} onClick={() => setMobilePane('tools')}>Preview &amp; AI</Button>
+      </div>
       {/* Main Content */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-col lg:flex-row h-[calc(100dvh-240px)] min-h-[400px] lg:h-[calc(100dvh-170px)] overflow-hidden">
         {/* Left Panel - Editor */}
-        <div className="w-1/2 border-r flex flex-col">
+        <div className={`w-full lg:w-1/2 lg:border-r min-h-0 flex-1 lg:flex-none flex-col ${mobilePane === 'edit' ? 'flex' : 'hidden lg:flex'}`}>
           <div className="border-b px-4 py-2 flex items-center justify-between bg-muted/30">
             <Tabs value={activeView} onValueChange={(v) => setActiveView(v as 'form' | 'latex')}>
               <TabsList className="h-8">
@@ -693,42 +697,45 @@ export default function CVEditorPage() {
               </TabsList>
             </Tabs>
           </div>
-          
+
           <ScrollArea className="flex-1">
             {activeView === 'form' ? (
               <div className="p-4 space-y-4">
-                <SectionBasics 
-                  data={cvData.basics} 
+                <SectionBasics
+                  data={cvData.basics}
                   onChange={(basics) => handleDataChange({ basics })}
                   cvId={cv.id}
+                  onPhotoUpload={handlePhotoUpload}
                 />
-                <SectionSummary 
-                  data={cvData.summary} 
-                  onChange={(summary) => handleDataChange({ summary })} 
+                <SectionSummary
+                  data={cvData.summary}
+                  onChange={(summary) => handleDataChange({ summary })}
                 />
-                <SectionExperience 
-                  data={cvData.experience} 
-                  onChange={(experience) => handleDataChange({ experience })} 
+                <SectionExperience
+                  data={cvData.experience}
+                  onChange={(experience) => handleDataChange({ experience })}
                 />
-                <SectionEducation 
-                  data={cvData.education} 
-                  onChange={(education) => handleDataChange({ education })} 
+                <SectionEducation
+                  data={cvData.education}
+                  onChange={(education) => handleDataChange({ education })}
                 />
-                <SectionSkills 
-                  data={cvData.skills} 
-                  onChange={(skills) => handleDataChange({ skills })} 
+                <SectionSkills
+                  data={cvData.skills}
+                  onChange={(skills) => handleDataChange({ skills })}
                 />
-                <SectionProjects 
-                  data={cvData.projects} 
-                  onChange={(projects) => handleDataChange({ projects })} 
+                <SectionProjects
+                  data={cvData.projects}
+                  onChange={(projects) => handleDataChange({ projects })}
                 />
-                <SectionCertifications 
-                  data={cvData.certifications} 
-                  onChange={(certifications) => handleDataChange({ certifications })} 
+                <SectionCertifications
+                  data={cvData.certifications}
+                  onChange={(certifications) => handleDataChange({ certifications })}
                 />
-                <SectionLanguages 
-                  languages={cvData.languages || []} 
-                  onChange={(languages) => handleDataChange({ languages })} 
+                <SectionAwards data={cvData.awards} onChange={awards => handleDataChange({ awards })} />
+                <SectionCustom data={cvData.customSections} onChange={customSections => handleDataChange({ customSections })} />
+                <SectionLanguages
+                  languages={cvData.languages || []}
+                  onChange={(languages) => handleDataChange({ languages })}
                 />
               </div>
             ) : (
@@ -737,15 +744,15 @@ export default function CVEditorPage() {
                   {latexCode}
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
-                  This is the generated LaTeX source used to build your PDF export.
+                  This source uses the latest compiled preview layout for these edits, or the base layout while a new preview is pending.
                 </p>
               </div>
             )}
           </ScrollArea>
         </div>
-        
+
         {/* Right Panel - Preview / ATS / JD Match */}
-        <div className="w-1/2 flex flex-col bg-muted/20">
+        <div className={`w-full lg:w-1/2 min-h-0 flex-1 lg:flex-none flex-col bg-muted/20 ${mobilePane === 'tools' ? 'flex' : 'hidden lg:flex'}`}>
           <div className="border-b px-4 py-2 flex items-center justify-between bg-muted/30">
             <Tabs value={rightPanel} onValueChange={(v) => setRightPanel(v as 'preview' | 'ats' | 'jd' | 'ai')}>
               <TabsList className="h-8">
@@ -768,8 +775,8 @@ export default function CVEditorPage() {
               </TabsList>
             </Tabs>
           </div>
-          
-          <div className="flex-1 p-4 overflow-hidden">
+
+          <div className="flex-1 min-h-0 p-2 sm:p-4 overflow-hidden">
             {rightPanel === 'preview' && (
               <div className="flex h-full flex-col overflow-hidden rounded-lg border bg-muted/20">
                 <div className="flex items-center justify-between border-b bg-background px-3 py-2">
@@ -825,7 +832,7 @@ export default function CVEditorPage() {
           </div>
         </div>
       </div>
-      
+
       {/* Save Version Dialog */}
       <Dialog open={saveVersionDialogOpen} onOpenChange={setSaveVersionDialogOpen}>
         <DialogContent>

@@ -1,6 +1,6 @@
 'use client'
 
-import { CVData, ATSReport } from '@/lib/types/cv'
+import { CVData } from '@/lib/types/cv'
 import { runATSChecks } from '@/lib/ats/checker'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
@@ -36,7 +36,7 @@ export function ATSPanel({ data }: ATSPanelProps) {
       groups[check.category].push(check)
     })
     return groups
-  }, [report.checks])
+  }, [report])
   
   const categoryLabels: Record<string, string> = {
     sections: 'Section Completeness',

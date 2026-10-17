@@ -3,21 +3,15 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { CVData } from '@/lib/types/cv'
-import { CVPreview } from '@/components/cv-editor/cv-preview'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { FileText, AlertCircle, ArrowLeft } from 'lucide-react'
 
-interface SharedCVVersion {
-  id: string
-  data: CVData
-}
-
 interface SharedCV {
-  id: string
+  title: string
   template_id: string
-  current_version?: SharedCVVersion
+  data: CVData
 }
 
 export default function SharedCVPage() {
@@ -26,6 +20,7 @@ export default function SharedCVPage() {
   const [cv, setCv] = useState<SharedCV | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
+  const [multiPage, setMultiPage] = useState(false)
   
   useEffect(() => {
     const loadSharedCV = async () => {
@@ -109,8 +104,6 @@ export default function SharedCVPage() {
   
   if (!cv) return null
   
-  const currentVersion = cv.current_version
-  if (!currentVersion) return null
   
   return (
     <div className="min-h-screen bg-muted/30">
@@ -132,19 +125,17 @@ export default function SharedCVPage() {
       <main className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="mb-4 text-center">
           <h1 className="text-xl font-semibold">
-            {currentVersion.data.basics.name || 'Unnamed'}'s CV
+            {cv.data.basics.name || 'Unnamed'}&apos;s CV
           </h1>
-          {currentVersion.data.basics.title && (
-            <p className="text-muted-foreground">{currentVersion.data.basics.title}</p>
+          {cv.data.basics.title && (
+            <p className="text-muted-foreground">{cv.data.basics.title}</p>
           )}
         </div>
         
-        <CVPreview 
-          data={currentVersion.data} 
-          templateId={cv.template_id}
-          className="min-h-[800px]"
-        />
-        
+        <label className="flex items-center gap-2 text-sm mb-3"><input type="checkbox" checked={multiPage} onChange={event => setMultiPage(event.target.checked)} />View full multi-page document if this CV exceeds one page</label>
+        <iframe title="Published CV PDF" src={`/api/share/${params.token}/pdf?pageMode=${multiPage ? 'multi-page' : 'one-page'}`} className="h-[850px] w-full rounded border bg-white" />
+        <a className="underline text-sm" href={`/api/share/${params.token}/pdf?pageMode=${multiPage ? 'multi-page' : 'one-page'}`} target="_blank" rel="noreferrer">Open the published PDF</a>
+
         <p className="text-center text-xs text-muted-foreground mt-4">
           Created with CV Builder
         </p>

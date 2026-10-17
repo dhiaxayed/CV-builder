@@ -54,10 +54,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   
   const signOut = async () => {
     try {
-      await fetch('/api/auth/session', { method: 'DELETE' })
+      const response = await fetch('/api/auth/session', { method: 'DELETE' })
+      if (!response.ok) throw new Error('Unable to sign out. Please retry.')
       setUser(null)
     } catch (error) {
-      console.error('[Auth] Error signing out:', error)
+      console.error('[Auth] Sign out failed')
+      throw error
     }
   }
   

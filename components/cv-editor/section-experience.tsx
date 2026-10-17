@@ -100,7 +100,7 @@ export function SectionExperience({ data = [], onChange }: SectionExperienceProp
             <Button variant="link" onClick={addItem}>Add your first experience</Button>
           </div>
         ) : (
-          safeData.map((item, index) => (
+          safeData.map((item) => (
             <Collapsible 
               key={item.id} 
               open={openItems.has(item.id)}
@@ -126,16 +126,16 @@ export function SectionExperience({ data = [], onChange }: SectionExperienceProp
                   <div className="p-4 pt-0 space-y-4 border-t">
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div className="space-y-2">
-                        <Label>Job Title</Label>
-                        <Input
+                        <Label htmlFor={`experience-${item.id}-1`}> Job Title</Label>
+                        <Input id={`experience-${item.id}-1`}
                           placeholder="Senior Software Engineer"
                           value={item.role}
                           onChange={(e) => updateItem(item.id, { role: e.target.value })}
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>Company</Label>
-                        <Input
+                        <Label htmlFor={`experience-${item.id}-2`}> Company</Label>
+                        <Input id={`experience-${item.id}-2`}
                           placeholder="TechCorp Inc."
                           value={item.company}
                           onChange={(e) => updateItem(item.id, { company: e.target.value })}
@@ -145,24 +145,24 @@ export function SectionExperience({ data = [], onChange }: SectionExperienceProp
                     
                     <div className="grid gap-4 sm:grid-cols-3">
                       <div className="space-y-2">
-                        <Label>Location</Label>
-                        <Input
+                        <Label htmlFor={`experience-${item.id}-3`}> Location</Label>
+                        <Input id={`experience-${item.id}-3`}
                           placeholder="San Francisco, CA"
                           value={item.location}
                           onChange={(e) => updateItem(item.id, { location: e.target.value })}
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>Start Date</Label>
-                        <Input
+                        <Label htmlFor={`experience-${item.id}-4`}> Start Date</Label>
+                        <Input id={`experience-${item.id}-4`}
                           type="month"
                           value={item.startDate}
                           onChange={(e) => updateItem(item.id, { startDate: e.target.value })}
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>End Date</Label>
-                        <Input
+                        <Label htmlFor={`experience-${item.id}-5`}> End Date</Label>
+                        <Input id={`experience-${item.id}-5`}
                           type="month"
                           value={item.endDate}
                           onChange={(e) => updateItem(item.id, { endDate: e.target.value })}
@@ -184,8 +184,8 @@ export function SectionExperience({ data = [], onChange }: SectionExperienceProp
                     </div>
                     
                     <div className="space-y-2">
-                      <Label>Technologies (comma-separated)</Label>
-                      <Input
+                      <Label htmlFor={`experience-${item.id}-6`}> Technologies (comma-separated)</Label>
+                      <Input id={`experience-${item.id}-6`}
                         placeholder="React, Node.js, PostgreSQL"
                         value={item.technologies?.join(', ') || ''}
                         onChange={(e) => updateItem(item.id, { 

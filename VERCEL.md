@@ -1,43 +1,55 @@
-# Vercel Deployment Guide
+# Vercel deployment
 
-## 1) Push repository
-Push your code to GitHub, GitLab, or Bitbucket.
+Vercel remains the production host. No VPS, container, additional authentication service or payment service is required. Keep the existing project/domain and review a Preview deployment before promoting the hardened application.
 
-## 2) Import project on Vercel
-1. Open Vercel dashboard.
-2. Click "Add New" -> "Project".
-3. Import this repository.
-4. Framework preset: Next.js.
+## Build and runtime
 
-## 3) Build settings
-- Build command: `pnpm build`
-- Output directory: leave empty (Next.js default)
-- Install command: `pnpm install --frozen-lockfile`
+- Framework: Next.js; Node.js 22.x (at least 22.16).
+- Install: `pnpm install --frozen-lockfile`; build: `pnpm build`.
+- Vercel builds first perform a read-only database readiness check: required columns and all eight application RPCs must be available with the server credential. An unavailable database, missing migrations or disabled PostgREST OpenAPI metadata stops the build before promotion. This never applies SQL or reads CV records; it does not replace the privileged grants/RLS verification. Local/CI builds without Vercel environment indicators skip this hosted check.
+- Keep the repository's `postinstall`: on Linux x64 it installs SHA-256-verified portable Tectonic 0.16.9 into `vendor/tectonic-linux-x64/bin`. `pnpm build` then compiles every design with both typefaces and a synthetic photo to prepare `vendor/tectonic-cache`. The same version is installed on Windows x64 for local verification. Custom download URLs/versions require `TECTONIC_SHA256`. Build failure stops deployment if these resources cannot compile.
+- Set `LATEX_RENDERER=tectonic`. The PDF routes use the Node runtime and allow 300 seconds. Verify Fluid Compute and your project's function duration settings.
+- `next.config.mjs` explicitly traces the Tectonic binary, prepared LaTeX resources and dynamically loaded PDF workers into both private and public PDF functions. Run `pnpm check:bundles` after the build. The native binary check runs on Linux CI; a Windows build cannot validate the Linux executable.
 
-## 4) Environment variables (required)
-Set these in Vercel Project Settings -> Environment Variables:
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`
-- `NEXT_PUBLIC_APP_URL` (your Vercel domain or custom domain)
-- `OPENROUTER_API_KEY`
-- `OPENROUTER_MODEL`
-- `EMAIL_PROVIDER`
-- `SMTP_HOST`
-- `SMTP_PORT`
-- `SMTP_USER`
-- `SMTP_PASS`
-- `SMTP_FROM`
+## Environment
 
-## 5) Important runtime notes
-- AI routes are configured with `maxDuration = 60`.
-- PDF export supports a LaTeX-first path and automatically falls back to a pure JavaScript PDF generator when LaTeX binaries are unavailable (common on serverless).
+Keep existing working values. Configure each Vercel environment separately, using an isolated Supabase project for Preview/staging.
 
-## 6) Domain and auth
-After attaching a custom domain, update `NEXT_PUBLIC_APP_URL` to the final HTTPS URL and redeploy.
+| Variable | Purpose |
+| --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | Required server-only credential for custom sessions/private queries; never use a `NEXT_PUBLIC_` prefix |
+| `NEXT_PUBLIC_APP_URL` | Actual HTTPS application origin, including the Preview origin when testing authentication |
+| `EMAIL_PROVIDER` | `smtp` or `resend`; console delivery is development-only |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | Existing SMTP configuration when SMTP is selected |
+| `RESEND_API_KEY` | Required only for Resend |
+| `GROQ_API_KEY`, `GROQ_MODEL` | Groq integration; default model `llama-3.3-70b-versatile` |
+| `OPENROUTER_API_KEY`, `OPENROUTER_MODEL` | Supported existing OpenRouter configuration when no Groq key is set |
+| `GROQ_TIMEOUT_MS`, `OPENROUTER_TIMEOUT_MS` | Per-call timeouts, default 10/25 seconds; the whole structured request is bounded by 40 seconds |
+| `LATEX_RENDERER` | `tectonic` on Vercel |
 
-## 7) Post-deploy smoke tests
-- Sign in flow works.
-- Create CV works.
-- Save + Version works.
-- PDF, LaTeX, JSON downloads work.
-- Share link works.
+The public Supabase key may remain configured for compatibility, but the application never uses it as a privileged fallback. Groq takes precedence when both provider keys exist; provider failures produce labelled local analysis, without silently switching providers. Free models can queue or time out despite valid credentials. Set `TRUST_PROXY_HEADERS=0` on Vercel; its trusted deployment IP header is handled directly.
+
+## Database rollout
+
+`SUPABASE_URL` is an optional private runtime override for the database URL; otherwise the existing public URL is used. Keep it aligned with the intended Supabase environment. `pnpm db:check:public` uses only the public key and `LIMIT 0`; a successful empty query remains inconclusive about RLS and must be settled with the verification SQL.
+
+Read [the coordinated migration and recovery procedure](docs/hardening-deployment.md). Back up first and apply `003-security-and-drafts.sql`, then `004-photo-assets.sql`, after migrations 001/002. Execute `scripts/verify-security.sql` using a privileged SQL session and test denial using the actual public key. Existing snapshots/data are preserved. Old application versions must stop writing before migration; a code-only rollback is unsafe.
+
+## Payload and compilation limits
+
+Vercel Functions limit request/response bodies to 4.5 MB. Photo uploads are capped at 4 MiB to leave room for multipart metadata; generated PDFs are also capped at 4 MiB. The renderer uses `/tmp`, bounded subprocess execution and a small in-memory cache. Prepared resources are copied to `/tmp` once per process, then Tectonic uses `--only-cached`; ordinary exports do not download LaTeX packages. Builds need outbound package access. Native binary execution and cold resource copying must still be tested on a real deployment. It never substitutes a different PDF layout when LaTeX fails.
+
+See [Vercel function limits](https://vercel.com/docs/functions/limitations) and [duration configuration](https://vercel.com/docs/functions/configuring-functions/duration). Project configuration can be more restrictive than platform limits.
+
+## Preview and production smoke checks
+
+1. Verify magic-link email receipt, expiry, one-use consumption, logout and both users' access isolation.
+2. Create/edit a CV, wait for autosave, reload, save several named snapshots, restore an older one and confirm original history is unchanged. Race two real database connections/tabs.
+3. Upload a valid photo; reject malformed/oversized images. Test all sixteen templates, including a cold PDF render with the actual Tectonic runtime, current contact links and accented text.
+4. Export PDF, LaTeX and portable JSON. Preview and PDF must agree; long CVs must receive an explicit overflow message unless multi-page export is selected.
+5. Publish, edit privately, revoke, and verify public JSON, PDF and photo access immediately. Re-enable and confirm the old token stays revoked.
+6. Run `pnpm test:ai:live` in a suitably configured local/staging shell. This sends only a synthetic CV and exits unsuccessfully when the provider falls back. Check real review/tailoring/condensation in Preview, including Pro permissions and apply/undo.
+7. Check the Pro contact email and “online payment coming soon” wording. Contacting support must not grant Pro.
+
+`/api/health` is inexpensive liveness/configuration information. It does not certify database grants, email delivery, provider availability or PDF compilation. Promote only after the real checks pass. No production deployment or database mutation was performed during local verification.

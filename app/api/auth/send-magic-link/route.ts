@@ -1,59 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAuthToken, getUserByEmail, createUser } from '@/lib/db/users'
+import { z } from 'zod'
+import { createAuthToken } from '@/lib/db/users'
 import { sendMagicLinkEmail } from '@/lib/email'
-import { resolveAppBaseUrl } from '@/lib/app-url'
+import { readJSON, apiError, requestOrigin } from '@/lib/server/api'
+import { rateLimit, clientAddress } from '@/lib/server/rate-limit'
+import { safeRedirect } from '@/lib/auth-redirect'
+import { AppError } from '@/lib/errors'
 
 export async function POST(request: NextRequest) {
   try {
-    const { email } = await request.json()
-    
-    if (!email || typeof email !== 'string') {
-      return NextResponse.json({ error: 'Email is required' }, { status: 400 })
-    }
-    
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(email)) {
-      return NextResponse.json({ error: 'Invalid email format' }, { status: 400 })
-    }
-    
-    // Normalize email
-    const normalizedEmail = email.toLowerCase().trim()
-    
-    // Check if user exists, if not create one
-    let user = await getUserByEmail(normalizedEmail)
-    if (!user) {
-      user = await createUser(normalizedEmail)
-    }
-    
-    // Create auth token
-    const token = await createAuthToken(normalizedEmail)
-    
-    // Build verification URL from the current request origin first, then env fallbacks.
-    const baseUrl = resolveAppBaseUrl(request.nextUrl.origin)
-    const verifyUrl = `${baseUrl}/api/auth/verify?token=${encodeURIComponent(token)}`
-    
-    // Send magic link email
-    const emailResult = await sendMagicLinkEmail(normalizedEmail, verifyUrl)
-    
-    if (!emailResult.success) {
-      console.error('[Auth] Failed to send magic link email:', emailResult.error)
-      return NextResponse.json({ error: 'Failed to send magic link email' }, { status: 502 })
-    }
-    
-    // Log in development
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[Auth] Magic link for', normalizedEmail, ':', verifyUrl)
-    }
-    
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Magic link sent to your email',
-      // Only include in development
-      ...(process.env.NODE_ENV === 'development' && { devLink: verifyUrl })
-    })
-  } catch (error) {
-    console.error('[Auth] Error sending magic link:', error)
-    return NextResponse.json({ error: 'Failed to send magic link' }, { status: 500 })
-  }
+    const { email, redirect } = await readJSON(request, z.object({ email: z.string().trim().toLowerCase().email().max(255), redirect: z.string().max(500).optional() }).strict(), 2048)
+    const address = clientAddress(request)
+    await rateLimit(`magic:ip:${address}`, address === 'unknown' ? 100 : 20, 900)
+    await rateLimit(`magic:email:${email}`, 3, 900)
+    const token = await createAuthToken(email)
+    const url = new URL('/api/auth/verify', requestOrigin(request))
+    url.searchParams.set('token', token)
+    url.searchParams.set('redirect', safeRedirect(redirect))
+    const devConsole = process.env.NODE_ENV === 'development' && process.env.EMAIL_PROVIDER === 'console'
+    const sent = await sendMagicLinkEmail(email, url.toString())
+    if (!sent.success) throw new AppError(502, 'EMAIL_UNAVAILABLE', 'Unable to send the sign-in email. Please retry.')
+    return NextResponse.json({ success: true, message: 'Check your email for a sign-in link.', ...(devConsole ? { devLink: url.toString() } : {}) }, { headers: { 'Cache-Control': 'no-store' } })
+  } catch (error) { return apiError(error) }
 }

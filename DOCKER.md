@@ -1,6 +1,6 @@
 # Docker Deployment Guide
 
-This project includes a production-ready Docker image with LaTeX installed (`xelatex`, `pdflatex`) for template-accurate PDF export.
+Vercel remains the production host (see [VERCEL.md](VERCEL.md)). The existing optional Docker setup includes an image with LaTeX installed (`xelatex`, `pdflatex`) for template-accurate PDF export.
 
 ## Option A: Local smoke test
 
@@ -19,7 +19,7 @@ curl http://localhost:3001/api/health
 docker exec -it cv-builder-app xelatex --version
 ```
 
-## Option B: Production with HTTPS (recommended)
+## Existing optional Docker hosting support
 
 Use `docker-compose.prod.yml` + Caddy for automatic TLS.
 
@@ -40,9 +40,9 @@ Set at least:
 - `NEXT_PUBLIC_APP_URL=https://your-domain.com`
 - `DOMAIN=your-domain.com`
 - `ACME_EMAIL=admin@your-domain.com`
-- Supabase keys
+- Supabase URL and server-only service-role key (see the coordinated migration procedure in `docs/hardening-deployment.md`)
 - SMTP / email provider vars
-- OpenRouter vars
+- Groq or existing OpenRouter vars
 
 ### 3) Deploy
 
@@ -69,6 +69,8 @@ docker compose -f docker-compose.prod.yml up -d --build
 
 ### 6) Rollback
 
+After the hardening migrations, a code-only rollback to the old application is unsafe. Follow the coordinated recovery procedure in `docs/hardening-deployment.md`; reconcile later user changes before restoring backups. The commands below apply only between schema-compatible releases.
+
 ```bash
 git checkout <previous-commit>
 docker compose -f docker-compose.prod.yml up -d --build
@@ -76,5 +78,5 @@ docker compose -f docker-compose.prod.yml up -d --build
 
 ## Notes for PDF export
 - `/api/pdf` uses LaTeX first for exact templates.
-- If LaTeX is unavailable at runtime, app falls back to compatibility PDF mode.
-- In this Docker image, LaTeX is installed by default, so fallback should be rare.
+- If LaTeX is unavailable at runtime, export fails clearly; no alternate-layout fallback is used.
+- Compile a real CV to verify readiness; health/version responses alone are insufficient.

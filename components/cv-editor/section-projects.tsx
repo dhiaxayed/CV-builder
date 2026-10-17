@@ -122,16 +122,16 @@ export function SectionProjects({ data = [], onChange }: SectionProjectsProps) {
                   <div className="p-4 pt-0 space-y-4 border-t">
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div className="space-y-2">
-                        <Label>Project Name</Label>
-                        <Input
+                        <Label htmlFor={`projects-${item.id}-1`}> Project Name</Label>
+                        <Input id={`projects-${item.id}-1`}
                           placeholder="My Awesome Project"
                           value={item.name}
                           onChange={(e) => updateItem(item.id, { name: e.target.value })}
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>URL (optional)</Label>
-                        <Input
+                        <Label htmlFor={`projects-${item.id}-2`}> URL (optional)</Label>
+                        <Input id={`projects-${item.id}-2`}
                           placeholder="github.com/user/project"
                           value={item.url || ''}
                           onChange={(e) => updateItem(item.id, { url: e.target.value })}
@@ -140,8 +140,8 @@ export function SectionProjects({ data = [], onChange }: SectionProjectsProps) {
                     </div>
                     
                     <div className="space-y-2">
-                      <Label>Description</Label>
-                      <Textarea
+                      <Label htmlFor={`projects-${item.id}-3`}> Description</Label>
+                      <Textarea id={`projects-${item.id}-3`}
                         placeholder="A brief description of what the project does"
                         value={item.description}
                         onChange={(e) => updateItem(item.id, { description: e.target.value })}
@@ -150,8 +150,8 @@ export function SectionProjects({ data = [], onChange }: SectionProjectsProps) {
                     </div>
                     
                     <div className="space-y-2">
-                      <Label>Technologies (comma-separated)</Label>
-                      <Input
+                      <Label htmlFor={`projects-${item.id}-4`}> Technologies (comma-separated)</Label>
+                      <Input id={`projects-${item.id}-4`}
                         placeholder="React, Node.js, PostgreSQL"
                         value={item.technologies.join(', ')}
                         onChange={(e) => updateItem(item.id, { 
@@ -160,6 +160,10 @@ export function SectionProjects({ data = [], onChange }: SectionProjectsProps) {
                       />
                     </div>
                     
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-2"><Label htmlFor={`project-${item.id}-start`}>Project start date</Label><Input id={`project-${item.id}-start`} type="month" value={item.startDate || ''} onChange={event => updateItem(item.id, { startDate:event.target.value })} /></div>
+                      <div className="space-y-2"><Label htmlFor={`project-${item.id}-end`}>Project end date</Label><Input id={`project-${item.id}-end`} type="month" value={item.endDate || ''} onChange={event => updateItem(item.id, { endDate:event.target.value })} /></div>
+                    </div>
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <Label>Key Achievements</Label>

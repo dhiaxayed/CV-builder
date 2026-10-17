@@ -1,3 +1,4 @@
+import { keywordPresent, KEYWORD_TERMS } from '../keywords'
 import { CVData, ATSCheck, ATSReport } from '../types/cv'
 
 // Strong action verbs for ATS
@@ -52,7 +53,6 @@ export function runATSChecks(data: CVData): ATSReport {
   const checks: ATSCheck[] = []
   
   // 1. Section completeness check
-  const requiredSections = ['basics', 'summary', 'experience', 'education', 'skills']
   const missingSections: string[] = []
   
   if (!data.basics.name) missingSections.push('Name')
@@ -95,7 +95,7 @@ export function runATSChecks(data: CVData): ATSReport {
     id: 'summary-length',
     category: 'length',
     name: 'Summary Length',
-    description: 'Summary should be 50-300 characters for optimal ATS parsing',
+    description: 'Heuristic style check: aim for a concise, informative summary',
     status: summaryLength >= 50 && summaryLength <= 300 ? 'pass' : summaryLength > 0 ? 'warning' : 'fail',
     details: summaryLength === 0 ? 'No summary provided' : `${summaryLength} characters (recommended: 50-300)`,
   })
@@ -316,26 +316,10 @@ export function extractKeywords(jobDescription: string): string[] {
   })
   
   // Get high-frequency words (mentioned 2+ times) or technical terms
-  const technicalTerms = new Set([
-    'javascript', 'typescript', 'python', 'java', 'c++', 'c#', 'ruby', 'go', 'golang',
-    'rust', 'scala', 'kotlin', 'swift', 'php', 'perl', 'r', 'sql', 'nosql',
-    'react', 'angular', 'vue', 'svelte', 'nextjs', 'next.js', 'nodejs', 'node.js',
-    'express', 'django', 'flask', 'fastapi', 'spring', 'rails', 'laravel',
-    'aws', 'azure', 'gcp', 'docker', 'kubernetes', 'k8s', 'terraform', 'ansible',
-    'jenkins', 'gitlab', 'github', 'bitbucket', 'jira', 'confluence',
-    'postgresql', 'mysql', 'mongodb', 'redis', 'elasticsearch', 'kafka', 'rabbitmq',
-    'html', 'css', 'sass', 'less', 'tailwind', 'bootstrap', 'webpack', 'vite',
-    'git', 'linux', 'unix', 'bash', 'shell', 'api', 'apis', 'microservices',
-    'agile', 'scrum', 'kanban', 'lean', 'waterfall',
-    'tensorflow', 'pytorch', 'keras', 'pandas', 'numpy', 'scikit-learn',
-    'hadoop', 'spark', 'airflow', 'dbt', 'snowflake', 'databricks',
-    'figma', 'sketch', 'adobe', 'photoshop', 'illustrator',
-    'leadership', 'communication', 'collaboration', 'problem-solving',
-    'analytical', 'strategic', 'innovative', 'detail-oriented',
-  ])
+
   
   const singleKeywords = Array.from(wordFreq.entries())
-    .filter(([word, count]) => count >= 2 || technicalTerms.has(word))
+    .filter(([word, count]) => count >= 2 || KEYWORD_TERMS.has(word))
     .sort((a, b) => b[1] - a[1])
     .map(([word]) => word)
     .slice(0, 30)
@@ -372,7 +356,7 @@ export function matchJobDescription(data: CVData, jobDescription: string): {
   const missingKeywords: string[] = []
   
   extractedKeywords.forEach(keyword => {
-    if (cvText.includes(keyword.toLowerCase())) {
+    if (keywordPresent(cvText, keyword)) {
       matchedKeywords.push(keyword)
     } else {
       missingKeywords.push(keyword)
@@ -388,13 +372,13 @@ export function matchJobDescription(data: CVData, jobDescription: string): {
   
   if (missingKeywords.length > 0) {
     const topMissing = missingKeywords.slice(0, 5)
-    suggestions.push(`Consider adding these keywords to your CV: ${topMissing.join(', ')}`)
+    suggestions.push(`Check these missing requirements; add keywords only when you have supporting experience: ${topMissing.join(', ')}`)
   }
   
   if (score < 50) {
     suggestions.push('Your CV may need significant tailoring for this role. Focus on the missing technical skills.')
   } else if (score < 70) {
-    suggestions.push('Good keyword match! Add a few more relevant skills to improve ATS compatibility.')
+    suggestions.push('Moderate keyword coverage. Highlight relevant skills you already have.')
   } else {
     suggestions.push('Excellent keyword coverage! Your CV is well-aligned with this job description.')
   }
@@ -404,7 +388,7 @@ export function matchJobDescription(data: CVData, jobDescription: string): {
     ['javascript', 'python', 'react', 'aws', 'docker', 'sql', 'api'].some(t => k.includes(t))
   )
   if (techKeywords.length > 0) {
-    suggestions.push(`Add technical skills: ${techKeywords.slice(0, 3).join(', ')}`)
+    suggestions.push(`Technical qualifications to verify (do not claim skills you lack): ${techKeywords.slice(0, 3).join(', ')}`)
   }
   
   return {

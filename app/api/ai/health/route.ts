@@ -1,58 +1,18 @@
 import { NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
-import { getSessionUser } from '@/lib/db/users'
-import { probeGroq } from '@/lib/ai/groq'
+import { requireUser, apiError } from '@/lib/server/api'
+import { rateLimit } from '@/lib/server/rate-limit'
+import { probeAI, configuredAIProvider, aiFailureReason } from '@/lib/ai/provider'
 
-export const runtime = 'nodejs'
 export const maxDuration = 60
-
 export async function GET() {
   try {
-    const cookieStore = await cookies()
-    const sessionToken = cookieStore.get('session')?.value
-
-    if (!sessionToken) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const user = await getSessionUser(sessionToken)
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const configured = Boolean(process.env.GROQ_API_KEY?.trim())
-    if (!configured) {
-      return NextResponse.json(
-        {
-          provider: 'groq',
-          configured: false,
-          available: false,
-          model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
-          error: 'GROQ_API_KEY is missing. Add it in Vercel Environment Variables, then redeploy.',
-        },
-        { status: 503 }
-      )
-    }
-
-    const probe = await probeGroq()
-
-    return NextResponse.json({
-      provider: 'groq',
-      configured: true,
-      available: probe.ok,
-      model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
-    })
-  } catch (error) {
-    console.error('[AI Health] Groq probe failed:', error)
-    return NextResponse.json(
-      {
-        provider: 'groq',
-        configured: Boolean(process.env.GROQ_API_KEY?.trim()),
-        available: false,
-        model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
-        error: error instanceof Error ? error.message : 'Groq probe failed.',
-      },
-      { status: 503 }
-    )
-  }
+    const user = await requireUser()
+    await rateLimit(`ai-health:${user.id}`,3,600)
+    const provider = configuredAIProvider()
+    const configured = Boolean(provider)
+    let available = false
+    let reason: string | undefined
+    try { available = configured ? (await probeAI()).ok : false } catch (error) { reason = aiFailureReason(error) }
+    return NextResponse.json({ provider,configured,available,...(reason ? { reason } : {}) },{ status:available ? 200 : 503,headers:{ 'Cache-Control':'no-store' } })
+  } catch (error) { return apiError(error) }
 }

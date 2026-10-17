@@ -1,60 +1,27 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getSessionUser, deleteSession } from '@/lib/db/users'
-import { isDatabaseConfigured } from '@/lib/db'
 import { resolveUserTier } from '@/lib/billing/tier'
+import { apiError, assertSameOrigin } from '@/lib/server/api'
 import { cookies } from 'next/headers'
 
 export async function GET() {
   try {
-    // Check if database is configured
-    if (!isDatabaseConfigured()) {
-      return NextResponse.json({ user: null, dbConfigured: false })
-    }
-    
     const cookieStore = await cookies()
-    const sessionToken = cookieStore.get('session')?.value
-    
-    if (!sessionToken) {
-      return NextResponse.json({ user: null })
-    }
-    
-    const user = await getSessionUser(sessionToken)
-    
-    if (!user) {
-      return NextResponse.json({ user: null })
-    }
-
-    const userTier = resolveUserTier(user)
-    
-    return NextResponse.json({ 
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        photoUrl: user.photo_url,
-        tier: userTier,
-      }
-    })
-  } catch (error) {
-    console.error('[Auth] Error getting session:', error)
-    return NextResponse.json({ user: null })
-  }
+    const token = cookieStore.get('session')?.value
+    const user = token ? await getSessionUser(token) : null
+    const response = NextResponse.json({ user: user ? { id:user.id,email:user.email,name:user.name,photoUrl:user.photo_url,tier:resolveUserTier(user) } : null },{ headers:{ 'Cache-Control':'no-store' } })
+    if (token && !user) response.cookies.delete('session')
+    return response
+  } catch (error) { return apiError(error) }
 }
 
-export async function DELETE() {
+export async function DELETE(request: Request) {
   try {
+    assertSameOrigin(request)
     const cookieStore = await cookies()
-    const sessionToken = cookieStore.get('session')?.value
-    
-    if (sessionToken && isDatabaseConfigured()) {
-      await deleteSession(sessionToken)
-    }
-    
+    const token = cookieStore.get('session')?.value
+    if (token) await deleteSession(token)
     cookieStore.delete('session')
-    
-    return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('[Auth] Error deleting session:', error)
-    return NextResponse.json({ error: 'Failed to sign out' }, { status: 500 })
-  }
+    return NextResponse.json({ success:true },{ headers:{ 'Cache-Control':'no-store' } })
+  } catch (error) { return apiError(error) }
 }

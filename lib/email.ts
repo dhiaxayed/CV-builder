@@ -192,7 +192,7 @@ export async function sendEmail(options: EmailOptions): Promise<EmailResult> {
       if (process.env.NODE_ENV === 'production') {
         return { success: false, error: 'Email provider is not configured for production' }
       }
-      return sendToConsole(options)
+      return sendToConsole()
   }
 }
 
@@ -204,7 +204,7 @@ async function sendWithResend(options: EmailOptions): Promise<EmailResult> {
       return { success: false, error: 'RESEND_API_KEY is not configured' }
     }
     console.warn('[Email] RESEND_API_KEY not configured, falling back to console')
-    return sendToConsole(options)
+    return sendToConsole()
   }
 
   try {
@@ -232,7 +232,7 @@ async function sendWithResend(options: EmailOptions): Promise<EmailResult> {
     console.log('[Email] Sent via Resend:', data.id)
     return { success: true, messageId: data.id }
   } catch (error) {
-    console.error('[Email] Resend error:', error)
+    console.error('[Email] Resend delivery failed')
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
   }
 }
@@ -249,7 +249,7 @@ async function sendWithSMTP(options: EmailOptions): Promise<EmailResult> {
       return { success: false, error: 'SMTP credentials are not configured' }
     }
     console.warn('[Email] SMTP credentials not configured, falling back to console')
-    return sendToConsole(options)
+    return sendToConsole()
   }
 
   try {
@@ -274,21 +274,13 @@ async function sendWithSMTP(options: EmailOptions): Promise<EmailResult> {
     console.log('[Email] Sent via SMTP:', info.messageId)
     return { success: true, messageId: info.messageId }
   } catch (error) {
-    console.error('[Email] SMTP error:', error)
+    console.error('[Email] SMTP delivery failed')
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
   }
 }
 
-async function sendToConsole(options: EmailOptions): Promise<EmailResult> {
-  console.log('\n' + '='.repeat(60))
-  console.log('EMAIL (Console Mode)')
-  console.log('='.repeat(60))
-  console.log(`To: ${options.to}`)
-  console.log(`Subject: ${options.subject}`)
-  console.log('-'.repeat(60))
-  console.log('Text Content:')
-  console.log(options.text || '(no text content)')
-  console.log('='.repeat(60) + '\n')
+async function sendToConsole(): Promise<EmailResult> {
+  console.info('[Email] Development console delivery enabled; use the development sign-in response.')
 
   return { success: true, messageId: `console-${Date.now()}` }
 }

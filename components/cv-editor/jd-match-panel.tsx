@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { FileSearch, CheckCircle2, XCircle, Sparkles, Copy, Lightbulb } from 'lucide-react'
+import { FileSearch, CheckCircle2, XCircle, Sparkles, Lightbulb } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface JDMatchPanelProps {
@@ -52,6 +52,8 @@ export function JDMatchPanel({ data, onCreateTailoredVersion }: JDMatchPanelProp
               Paste a job description to analyze keyword matches and get suggestions for tailoring your CV.
             </p>
             <Textarea
+              aria-label="Job description for local keyword matching"
+              maxLength={20000}
               placeholder="Paste the job description here..."
               value={jobDescription}
               onChange={(e) => setJobDescription(e.target.value)}

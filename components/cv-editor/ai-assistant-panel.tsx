@@ -1,10 +1,9 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 import { AIAtsReview, AIJobTailorAnalysis } from '@/lib/ai/types'
 import { ATSReport, CVData } from '@/lib/types/cv'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
@@ -25,6 +24,8 @@ import {
   AlertTriangle,
   XCircle,
 } from 'lucide-react'
+import { PRO_CONTACT_URL } from '@/lib/billing/contact'
+import type { Condensation } from '@/lib/ai/condense'
 import { cn } from '@/lib/utils'
 
 interface AIAssistantPanelProps {
@@ -43,13 +44,13 @@ interface AIAssistantPanelProps {
 type ReviewResponse = {
   review: AIAtsReview
   heuristicReport: ATSReport
-  source: 'groq' | 'heuristic-fallback'
+  source: 'groq' | 'openrouter' | 'heuristic-fallback'
   aiError?: string
 }
 
 type TailorResponse = {
   analysis: AIJobTailorAnalysis
-  source: 'groq' | 'heuristic-fallback'
+  source: 'groq' | 'openrouter' | 'heuristic-fallback'
   aiError?: string
   savedJobDescriptionId?: string | null
   heuristicMatch: {
@@ -80,7 +81,7 @@ async function readApiResponse<T>(response: Response): Promise<T & { error?: str
     return JSON.parse(body) as T & { error?: string; code?: string }
   } catch {
     return {
-      error: response.ok ? 'The server returned an invalid response.' : body,
+      error: 'The server returned an invalid response. Please retry.',
     } as T & { error?: string; code?: string }
   }
 }
@@ -96,6 +97,10 @@ export function AIAssistantPanel({
   const { user } = useAuth()
   const { toast } = useToast()
   const [isReviewLoading, setIsReviewLoading] = useState(false)
+  const [condensation, setCondensation] = useState<(Condensation & { source: string }) | null>(null)
+  const [isCondensing, setIsCondensing] = useState(false)
+  const [selected, setSelected] = useState<string[]>([])
+  const toggle = (key: string) => setSelected(current => current.includes(key) ? current.filter(item => item !== key) : [...current,key])
   const [isTailorLoading, setIsTailorLoading] = useState(false)
   const [reviewData, setReviewData] = useState<ReviewResponse | null>(null)
   const [tailorData, setTailorData] = useState<TailorResponse | null>(null)
@@ -107,7 +112,7 @@ export function AIAssistantPanel({
   const [jobDescription, setJobDescription] = useState('')
   const isProUser = user?.tier === 'pro'
 
-  const loadJobHistory = async () => {
+  const loadJobHistory = useCallback(async () => {
     if (!isProUser) {
       setJobHistory([])
       return
@@ -118,11 +123,11 @@ export function AIAssistantPanel({
 
     const payload = await readApiResponse<{ jobDescriptions?: JobDescriptionHistoryItem[] }>(response)
     setJobHistory(payload.jobDescriptions || [])
-  }
+  }, [isProUser])
 
   useEffect(() => {
-    loadJobHistory()
-  }, [isProUser])
+    void loadJobHistory().catch(() => {})
+  }, [loadJobHistory])
 
   const scoreTone = useMemo(() => {
     const score = reviewData?.review.atsReadinessScore ?? tailorData?.analysis.atsFitScore ?? 0
@@ -130,6 +135,17 @@ export function AIAssistantPanel({
     if (score >= 55) return 'text-yellow-600'
     return 'text-red-600'
   }, [reviewData, tailorData])
+
+  const handleCondense = async () => {
+    setIsCondensing(true)
+    try {
+      const response = await fetch('/api/ai/condense', { method:'POST',headers:{ 'Content-Type':'application/json' },body:JSON.stringify({ cvId,cvData:data }) })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Could not suggest reductions')
+      setCondensation(result)
+    } catch (error) { toast({ title:error instanceof Error ? error.message : 'Could not suggest reductions',variant:'destructive' }) }
+    finally { setIsCondensing(false) }
+  }
 
   const handleReview = async () => {
     setIsReviewLoading(true)
@@ -228,15 +244,35 @@ export function AIAssistantPanel({
   }
 
   return (
-    <Card className="h-full">
+    <Card className="h-full min-h-0">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-lg">
           <Sparkles className="h-5 w-5" />
           AI Career Assistant
         </CardTitle>
       </CardHeader>
-      <CardContent className="h-[calc(100%-72px)]">
-        <ScrollArea className="h-full pr-4">
+      <CardContent className="flex-1 min-h-0 overflow-y-auto space-y-4">
+        <p className="text-xs text-muted-foreground">AI actions send career content to the configured provider (Groq or OpenRouter), without your photo or contact details. Scores estimate content quality; they do not measure ATS certification or hiring probability. Review every proposed claim.</p>
+        {!isProUser && <p className="text-xs"><a className="underline" href={PRO_CONTACT_URL}>Contact Us to Upgrade to Pro</a>. Online payment integration coming soon.</p>}
+        <div className="space-y-3 rounded border p-3">
+          <p className="font-medium text-sm">Fit a readable page</p>
+          <Button size="sm" variant="outline" disabled={isCondensing} onClick={handleCondense}>{isCondensing ? 'Suggesting reductions...' : 'Suggest shorter content'}</Button>
+          {condensation && <div className="space-y-3 text-xs">
+            <p>{condensation.source !== 'heuristic-fallback' ? 'AI suggestions' : 'Local wording suggestions'}: {condensation.explanation}</p>
+            <p><strong>Current summary:</strong> {data.summary}</p><p><strong>Proposed:</strong> {condensation.summary}</p>
+            <Button size="sm" variant="outline" disabled={condensation.summary === data.summary} onClick={() => onApplySummary(condensation.summary)}>Apply shorter summary</Button>
+            {condensation.experienceRewrites.map(rewrite => <div className="space-y-2 border-t pt-2" key={rewrite.experienceId}>
+              <p>{data.experience.find(item => item.id === rewrite.experienceId)?.role}</p>
+              <p><strong>Current:</strong> {data.experience.find(item => item.id === rewrite.experienceId)?.bullets.join('; ')}</p>
+              <p><strong>Proposed:</strong> {rewrite.bullets.join('; ')}</p><p>{rewrite.rationale}</p>
+              <Button size="sm" variant="outline" disabled={JSON.stringify(rewrite.bullets) === JSON.stringify(data.experience.find(item => item.id === rewrite.experienceId)?.bullets)} onClick={() => onApplyExperienceBullets(rewrite.experienceId,rewrite.bullets)}>Apply shorter bullets</Button>
+            </div>)}
+            <Button variant="ghost" size="sm" onClick={() => setCondensation(null)}>Dismiss reduction suggestions</Button>
+            <p>After applying, open Preview to compile and verify the page count. Use Undo AI change to recover earlier wording.</p>
+          </div>}
+        </div>
+
+        <div className="pr-1">
           <div className="space-y-4">
             <div className="rounded-lg border bg-primary/5 p-3">
               <p className="text-sm font-medium">How to use this assistant</p>
@@ -246,7 +282,7 @@ export function AIAssistantPanel({
                 <p>3. Apply only the changes that match your real experience, then save a new version.</p>
               </div>
               <p className="mt-3 text-xs text-muted-foreground">
-                Requests on the free model can take 30-60 seconds. Keep this panel open while results are loading.
+                Keep this panel open while results are loading. Provider failures return labelled local checks.
               </p>
             </div>
 
@@ -256,7 +292,7 @@ export function AIAssistantPanel({
                 1. Review Your CV
               </div>
               <p className="mb-3 text-xs text-muted-foreground">
-                Run a stricter AI ATS and recruiter review, then apply a sharper summary or missing skills.
+                Review content quality, then compare and apply suggestions grounded in your existing experience.
               </p>
               {reviewError && (
                 <div className="mb-3 rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-700">
@@ -275,7 +311,7 @@ export function AIAssistantPanel({
               </Button>
               {isReviewLoading && (
                 <p className="mt-2 text-xs text-muted-foreground">
-                  Generating a strict ATS review and recruiter readability check...
+                  Reviewing CV content and readability...
                 </p>
               )}
             </div>
@@ -284,14 +320,14 @@ export function AIAssistantPanel({
               <div className="space-y-3 rounded-lg border p-3">
                 {reviewData.source === 'heuristic-fallback' && (
                   <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-                    <p>Groq was unavailable, so this review used the local ATS heuristic engine.</p>
+                    <p>AI was unavailable, so this review used the local ATS heuristic engine.</p>
                     {reviewData.aiError && <p className="mt-1">Reason: {reviewData.aiError}</p>}
                   </div>
                 )}
                 <div className="grid grid-cols-3 gap-2 text-center">
                   <div className="rounded-md bg-muted p-2">
                     <div className={cn('text-2xl font-bold', scoreTone)}>{reviewData.review.atsReadinessScore}%</div>
-                    <div className="text-[11px] text-muted-foreground">AI ATS</div>
+                    <div className="text-[11px] text-muted-foreground">Content estimate</div>
                   </div>
                   <div className="rounded-md bg-muted p-2">
                     <div className="text-2xl font-bold text-blue-600">{reviewData.review.recruiterReadabilityScore}%</div>
@@ -361,8 +397,8 @@ export function AIAssistantPanel({
                     <Wand2 className="h-4 w-4 text-primary" />
                     Rewritten Summary
                   </div>
-                  <p className="text-xs text-muted-foreground">{reviewData.review.rewrittenSummary}</p>
-                  <Button size="sm" variant="outline" onClick={() => onApplySummary(reviewData.review.rewrittenSummary)}>
+                  <p className="text-xs text-muted-foreground"><strong>Current:</strong> {data.summary}</p><p className="text-xs text-muted-foreground"><strong>Proposed:</strong> {reviewData.review.rewrittenSummary}</p>
+                  <Button size="sm" variant="outline" disabled={reviewData.review.rewrittenSummary === data.summary} onClick={() => onApplySummary(reviewData.review.rewrittenSummary)}>
                     Apply Summary
                   </Button>
                 </div>
@@ -372,13 +408,11 @@ export function AIAssistantPanel({
                     <div className="text-sm font-medium">Recommended Skills to Add</div>
                     <div className="flex flex-wrap gap-1">
                       {reviewData.review.skillsToAdd.map((skill) => (
-                        <Badge key={skill} variant="secondary">
-                          {skill}
-                        </Badge>
+                        <label key={skill} className="flex items-center gap-1 text-xs"><input type="checkbox" checked={selected.includes(`skill:${skill}`)} onChange={() => toggle(`skill:${skill}`)} />{skill}</label>
                       ))}
                     </div>
-                    <Button size="sm" variant="outline" onClick={() => onAddSkills(reviewData.review.skillsToAdd)}>
-                      Add Skills to CV
+                    <Button size="sm" variant="outline" onClick={() => onAddSkills(reviewData.review.skillsToAdd.filter(skill => selected.includes(`skill:${skill}`)))}>
+                      Add Selected Skills
                     </Button>
                   </div>
                 )}
@@ -466,6 +500,7 @@ export function AIAssistantPanel({
                     id="ai-job-description"
                     placeholder="Paste the job description here..."
                     value={jobDescription}
+                maxLength={20000}
                     onChange={(e) => setJobDescription(e.target.value)}
                     className="min-h-40"
                   />
@@ -490,7 +525,7 @@ export function AIAssistantPanel({
               <div className="space-y-3 rounded-lg border p-3">
                 {tailorData.source === 'heuristic-fallback' && (
                   <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-                    <p>Groq was unavailable, so this tailoring package used local keyword and ATS heuristics.</p>
+                    <p>AI was unavailable, so this tailoring package used local keyword and ATS heuristics.</p>
                     {tailorData.aiError && <p className="mt-1">Reason: {tailorData.aiError}</p>}
                   </div>
                 )}
@@ -501,7 +536,7 @@ export function AIAssistantPanel({
                   </div>
                   <div className="rounded-md bg-muted p-2">
                     <div className="text-2xl font-bold text-blue-600">{tailorData.analysis.atsFitScore}%</div>
-                    <div className="text-[11px] text-muted-foreground">ATS Fit</div>
+                    <div className="text-[11px] text-muted-foreground">Content fit estimate</div>
                   </div>
                   <div className="rounded-md bg-muted p-2">
                     <div className="text-2xl font-bold text-slate-700">{tailorData.heuristicMatch.score}%</div>
@@ -516,7 +551,8 @@ export function AIAssistantPanel({
 
                 <div className="space-y-2 rounded-md border p-3">
                   <div className="text-sm font-medium">Tailored Summary</div>
-                  <p className="text-xs text-muted-foreground">{tailorData.analysis.tailoredSummary}</p>
+                  <p className="text-xs text-muted-foreground"><strong>Current:</strong> {data.summary}</p><p className="text-xs text-muted-foreground"><strong>Proposed:</strong> {tailorData.analysis.tailoredSummary}</p>
+                  <label className="flex gap-2 text-xs"><input type="checkbox" checked={selected.includes('summary')} onChange={() => toggle('summary')} />Include proposed summary</label>
                   <div className="flex gap-2">
                     <Button size="sm" variant="outline" onClick={() => onApplySummary(tailorData.analysis.tailoredSummary)}>
                       Apply Summary
@@ -524,15 +560,16 @@ export function AIAssistantPanel({
                     <Button
                       size="sm"
                       variant="outline"
+                      disabled={selected.length === 0}
                       onClick={() =>
                         onApplyTailoredPackage({
-                          summary: tailorData.analysis.tailoredSummary,
-                          skills: tailorData.analysis.skillsToAdd,
-                          experienceRewrites: tailorData.analysis.experienceRewrites,
+                          summary: selected.includes('summary') ? tailorData.analysis.tailoredSummary : data.summary,
+                          skills: tailorData.analysis.skillsToAdd.filter(skill => selected.includes(`skill:${skill}`)),
+                          experienceRewrites: tailorData.analysis.experienceRewrites.filter(rewrite => selected.includes(`experience:${rewrite.experienceId}`)),
                         })
                       }
                     >
-                      Apply Full Package
+                      Apply Selected Changes
                     </Button>
                   </div>
                 </div>
@@ -542,13 +579,11 @@ export function AIAssistantPanel({
                     <div className="text-sm font-medium">Keywords / Skills to Add</div>
                     <div className="flex flex-wrap gap-1">
                       {tailorData.analysis.skillsToAdd.map((skill) => (
-                        <Badge key={skill} variant="secondary">
-                          {skill}
-                        </Badge>
+                        <label key={skill} className="flex items-center gap-1 text-xs"><input type="checkbox" checked={selected.includes(`skill:${skill}`)} onChange={() => toggle(`skill:${skill}`)} />{skill}</label>
                       ))}
                     </div>
-                    <Button size="sm" variant="outline" onClick={() => onAddSkills(tailorData.analysis.skillsToAdd)}>
-                      Add Skills to CV
+                    <Button size="sm" variant="outline" onClick={() => onAddSkills(tailorData.analysis.skillsToAdd.filter(skill => selected.includes(`skill:${skill}`)))}>
+                      Add Selected Skills
                     </Button>
                   </div>
                 )}
@@ -571,6 +606,8 @@ export function AIAssistantPanel({
                             Apply Bullets
                           </Button>
                         </div>
+                        <label className="flex gap-2 text-xs mt-2"><input type="checkbox" checked={selected.includes(`experience:${rewrite.experienceId}`)} onChange={() => toggle(`experience:${rewrite.experienceId}`)} />Include these bullets</label>
+                        <p className="text-xs text-muted-foreground mt-2"><strong>Current:</strong> {data.experience.find(item => item.id === rewrite.experienceId)?.bullets.join('; ')}</p>
                         <ul className="mt-2 space-y-1">
                           {rewrite.bullets.map((bullet) => (
                             <li key={bullet} className="text-xs text-muted-foreground">
@@ -620,7 +657,7 @@ export function AIAssistantPanel({
               </div>
             )}
           </div>
-        </ScrollArea>
+        </div>
       </CardContent>
     </Card>
   )

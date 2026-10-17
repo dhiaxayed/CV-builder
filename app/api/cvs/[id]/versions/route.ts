@@ -1,105 +1,34 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
-import { getSessionUser } from '@/lib/db/users'
+import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { getCV, createCVVersion, restoreCVVersion } from '@/lib/db/cvs'
+import { requireUser, readJSON, apiError } from '@/lib/server/api'
+import { revisionSchema } from '@/lib/validation/cv'
+import { AppError } from '@/lib/errors'
 
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+type Context = { params: Promise<{ id: string }> }
+export async function GET(_request: Request, { params }: Context) {
   try {
-    const { id } = await params
-    const cookieStore = await cookies()
-    const sessionToken = cookieStore.get('session')?.value
-    
-    if (!sessionToken) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    
-    const user = await getSessionUser(sessionToken)
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    
-    const cv = await getCV(id)
-    if (!cv || cv.user_id !== user.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
-    }
-    
+    const user = await requireUser()
+    const cv = await getCV((await params).id, user.id)
+    if (!cv) throw new AppError(404, 'CV_NOT_FOUND', 'CV not found')
+    return NextResponse.json({ cv }, { headers: { 'Cache-Control': 'no-store' } })
+  } catch (error) { return apiError(error) }
+}
+
+export async function POST(request: Request, { params }: Context) {
+  try {
+    const user = await requireUser()
+    const body = await readJSON(request, z.object({ expectedRevision: revisionSchema, note: z.string().max(500).optional() }).strict())
+    const result = await createCVVersion((await params).id, user.id, body.expectedRevision, body.note)
+    return NextResponse.json(result, { status: 201 })
+  } catch (error) { return apiError(error) }
+}
+
+export async function PUT(request: Request, { params }: Context) {
+  try {
+    const user = await requireUser()
+    const body = await readJSON(request, z.object({ versionId: z.string().min(1).max(100), expectedRevision: revisionSchema }).strict())
+    const cv = await restoreCVVersion((await params).id, user.id, body.versionId, body.expectedRevision)
     return NextResponse.json({ cv })
-  } catch (error) {
-    console.error('Error getting versions:', error)
-    return NextResponse.json({ error: 'Failed to get versions' }, { status: 500 })
-  }
-}
-
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params
-    const cookieStore = await cookies()
-    const sessionToken = cookieStore.get('session')?.value
-    
-    if (!sessionToken) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    
-    const user = await getSessionUser(sessionToken)
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    
-    const cv = await getCV(id)
-    if (!cv || cv.user_id !== user.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
-    }
-    
-    const { data, note } = await request.json()
-    
-    const version = await createCVVersion(id, data, note, user.id)
-    
-    return NextResponse.json({ version })
-  } catch (error) {
-    console.error('Error creating version:', error)
-    return NextResponse.json({ error: 'Failed to create version' }, { status: 500 })
-  }
-}
-
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params
-    const cookieStore = await cookies()
-    const sessionToken = cookieStore.get('session')?.value
-    
-    if (!sessionToken) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    
-    const user = await getSessionUser(sessionToken)
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    
-    const cv = await getCV(id)
-    if (!cv || cv.user_id !== user.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
-    }
-    
-    const { versionId } = await request.json()
-    
-    const updatedCV = await restoreCVVersion(id, versionId)
-    if (!updatedCV) {
-      return NextResponse.json({ error: 'Version not found for this CV' }, { status: 404 })
-    }
-    
-    return NextResponse.json({ cv: updatedCV })
-  } catch (error) {
-    console.error('Error restoring version:', error)
-    return NextResponse.json({ error: 'Failed to restore version' }, { status: 500 })
-  }
+  } catch (error) { return apiError(error) }
 }

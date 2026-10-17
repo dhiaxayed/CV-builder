@@ -1,11 +1,13 @@
 'use client'
 
-import { useEffect, useState, type CSSProperties, type MouseEvent } from 'react'
+import { useState, type CSSProperties, type MouseEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { TEMPLATES } from '@/lib/templates'
+import { PRO_CONTACT_URL } from '@/lib/billing/contact'
 import { TemplatePreviewCard } from '@/components/template-preview-card'
 import {
   FileText,
@@ -25,37 +27,12 @@ import {
   ChevronRight,
 } from 'lucide-react'
 
-const TEMPLATE_GROUPS = [
-  [
-    { id: 'modern', name: 'Modern', style: 'ATS-Friendly', popular: true },
-    { id: 'classic', name: 'Classic', style: 'Professional' },
-    { id: 'minimal', name: 'Minimal', style: 'Clean & Simple' },
-    { id: 'compact', name: 'Compact', style: 'Space-Efficient' },
-  ],
-  [
-    { id: 'professional', name: 'Professional', style: 'Executive Business', popular: true },
-    { id: 'executive', name: 'Executive', style: 'Leadership Focused' },
-    { id: 'banking', name: 'Banking', style: 'Corporate Finance' },
-    { id: 'elegant', name: 'Elegant', style: 'Premium Sidebar', popular: true },
-  ],
-  [
-    { id: 'creative', name: 'Creative', style: 'Visual Design' },
-    { id: 'fancy', name: 'Fancy', style: 'Decorative Style' },
-    { id: 'bold', name: 'Bold', style: 'High Contrast' },
-    { id: 'infographic', name: 'Infographic', style: 'Visual Data', popular: true },
-  ],
-  [
-    { id: 'tech', name: 'Tech', style: 'Developer Focused', popular: true },
-    { id: 'academic', name: 'Academic', style: 'Research & PhD' },
-    { id: 'casual', name: 'Casual', style: 'Startup Friendly' },
-    { id: 'vintage', name: 'Vintage', style: 'Classic Elegance' },
-  ],
-]
+const TEMPLATE_GROUPS = Array.from({ length: 4 }, (_, index) => TEMPLATES.slice(index * 4, index * 4 + 4))
 
 const HERO_SIGNALS = [
   {
     label: 'ATS readiness',
-    value: '92%',
+    value: 'Content checks',
     detail: 'Checks structure, keywords, readability, and recruiter scan quality.',
   },
   {
@@ -125,11 +102,6 @@ export default function HomePage() {
   const router = useRouter()
   const [ctaPointer, setCtaPointer] = useState({ x: 50, y: 50, active: false })
 
-  useEffect(() => {
-    if (!isLoading && user) {
-      router.push('/dashboard')
-    }
-  }, [isLoading, user, router])
 
   const handleCtaPointerMove = (event: MouseEvent<HTMLElement>) => {
     const bounds = event.currentTarget.getBoundingClientRect()
@@ -408,7 +380,7 @@ export default function HomePage() {
                     name={template.name}
                     subtitle={template.style}
                     popular={template.popular}
-                    onClick={() => router.push('/auth/signin')}
+                    onClick={() => router.push(user ? `/cv/new?template=${template.id}` : `/auth/signin?redirect=${encodeURIComponent(`/cv/new?template=${template.id}`)}`)}
                     ctaLabel="Use Template"
                   />
                 ))}
@@ -489,12 +461,10 @@ export default function HomePage() {
                     <GreenBullet key={feature}>{feature}</GreenBullet>
                   ))}
                 </ul>
-                <Button
-                  className="w-full bg-slate-950 text-white hover:bg-slate-800"
-                  onClick={() => router.push('/auth/signin')}
-                >
-                  Sign in for Pro access
+                <Button className="w-full bg-slate-950 text-white hover:bg-slate-800" asChild>
+                  <a href={PRO_CONTACT_URL}>Contact Us to Upgrade to Pro</a>
                 </Button>
+                <p className="mt-3 text-sm text-muted-foreground">Online payment integration coming soon.</p>
               </CardContent>
             </Card>
           </div>

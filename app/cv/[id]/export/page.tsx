@@ -15,6 +15,7 @@ import { ArrowLeft, Download, FileText, Share2, Copy, ExternalLink, Code, FileDo
 
 type DbCV = {
   id: string
+  revision: number
   title: string
   template_id: string
   is_public: boolean
@@ -30,6 +31,8 @@ export default function ExportPage() {
   const [cv, setCv] = useState<DbCV | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [shareUrl, setShareUrl] = useState('')
+  const [multiPage, setMultiPage] = useState(false)
+  const [sharingBusy, setSharingBusy] = useState(false)
   
   useEffect(() => {
     if (!authLoading && !user) {
@@ -68,7 +71,7 @@ export default function ExportPage() {
     if (user && params.id) {
       loadCV()
     }
-  }, [authLoading, user, params.id, router])
+  }, [authLoading, user, params.id, router, toast])
   
   const downloadFile = async (format: 'pdf' | 'latex' | 'json') => {
     if (!cv?.data) return
@@ -79,8 +82,9 @@ export default function ExportPage() {
         headers: { 'Content-Type': 'application/json' },
         cache: 'no-store',
         body: JSON.stringify({
-          cvData: cv.data,
           cvId: cv.id,
+          expectedRevision: cv.revision,
+          pageMode: multiPage ? 'multi-page' : 'one-page',
           templateId: cv.template_id,
           title: cv.title,
           format,
@@ -115,8 +119,8 @@ export default function ExportPage() {
   }
   
   const toggleSharing = async (enabled: boolean) => {
-    if (!cv) return
-    
+    if (!cv || sharingBusy) return
+    setSharingBusy(true)
     try {
       const response = await fetch(`/api/cvs/${cv.id}/share`, {
         method: 'POST',
@@ -145,12 +149,11 @@ export default function ExportPage() {
         title: error instanceof Error ? error.message : 'Failed to update sharing', 
         variant: 'destructive' 
       })
-    }
+    } finally { setSharingBusy(false) }
   }
   
-  const copyShareUrl = () => {
-    navigator.clipboard.writeText(shareUrl)
-    toast({ title: 'Link copied to clipboard' })
+  const copyShareUrl = async () => {
+    try { await navigator.clipboard.writeText(shareUrl); toast({ title: 'Link copied to clipboard' }) } catch { toast({ title: 'Could not copy. Select and copy the link.', variant: 'destructive' }) }
   }
   
   if (authLoading || isLoading) {
@@ -201,7 +204,7 @@ export default function ExportPage() {
         <div className="mb-6">
           <h1 className="text-2xl font-bold mb-2">Export & Share</h1>
           <p className="text-muted-foreground">
-            Download your CV in various formats or share it with others.
+            Download your CV or publish a snapshot. Draft changes stay private; disable and re-enable sharing to publish a newer snapshot.
           </p>
         </div>
         
@@ -218,6 +221,7 @@ export default function ExportPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={multiPage} onChange={e => setMultiPage(e.target.checked)} />Allow multi-page PDF (default is strict one-page)</label>
               <div className="p-4 border rounded-lg">
                 <div className="flex items-start justify-between">
                   <div className="flex items-start gap-3">
@@ -309,7 +313,7 @@ export default function ExportPage() {
                 </div>
                 <Switch
                   checked={cv.is_public}
-                  onCheckedChange={toggleSharing}
+                  onCheckedChange={toggleSharing} disabled={sharingBusy}
                 />
               </div>
               

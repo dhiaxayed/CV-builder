@@ -103,16 +103,16 @@ export function SectionEducation({ data = [], onChange }: SectionEducationProps)
                   <div className="p-4 pt-0 space-y-4 border-t">
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div className="space-y-2">
-                        <Label>Institution</Label>
-                        <Input
+                        <Label htmlFor={`education-${item.id}-1`}> Institution</Label>
+                        <Input id={`education-${item.id}-1`}
                           placeholder="University of California"
                           value={item.institution}
                           onChange={(e) => updateItem(item.id, { institution: e.target.value })}
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>Location</Label>
-                        <Input
+                        <Label htmlFor={`education-${item.id}-2`}> Location</Label>
+                        <Input id={`education-${item.id}-2`}
                           placeholder="Berkeley, CA"
                           value={item.location}
                           onChange={(e) => updateItem(item.id, { location: e.target.value })}
@@ -122,16 +122,16 @@ export function SectionEducation({ data = [], onChange }: SectionEducationProps)
                     
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div className="space-y-2">
-                        <Label>Degree</Label>
-                        <Input
+                        <Label htmlFor={`education-${item.id}-3`}> Degree</Label>
+                        <Input id={`education-${item.id}-3`}
                           placeholder="Bachelor of Science"
                           value={item.degree}
                           onChange={(e) => updateItem(item.id, { degree: e.target.value })}
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>Field of Study</Label>
-                        <Input
+                        <Label htmlFor={`education-${item.id}-4`}> Field of Study</Label>
+                        <Input id={`education-${item.id}-4`}
                           placeholder="Computer Science"
                           value={item.field}
                           onChange={(e) => updateItem(item.id, { field: e.target.value })}
@@ -141,24 +141,24 @@ export function SectionEducation({ data = [], onChange }: SectionEducationProps)
                     
                     <div className="grid gap-4 sm:grid-cols-3">
                       <div className="space-y-2">
-                        <Label>Start Date</Label>
-                        <Input
+                        <Label htmlFor={`education-${item.id}-5`}> Start Date</Label>
+                        <Input id={`education-${item.id}-5`}
                           type="month"
                           value={item.startDate}
                           onChange={(e) => updateItem(item.id, { startDate: e.target.value })}
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>End Date</Label>
-                        <Input
+                        <Label htmlFor={`education-${item.id}-6`}> End Date</Label>
+                        <Input id={`education-${item.id}-6`}
                           type="month"
                           value={item.endDate}
                           onChange={(e) => updateItem(item.id, { endDate: e.target.value })}
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>GPA (optional)</Label>
-                        <Input
+                        <Label htmlFor={`education-${item.id}-7`}> GPA (optional)</Label>
+                        <Input id={`education-${item.id}-7`}
                           placeholder="3.8"
                           value={item.gpa || ''}
                           onChange={(e) => updateItem(item.id, { gpa: e.target.value })}
@@ -167,8 +167,8 @@ export function SectionEducation({ data = [], onChange }: SectionEducationProps)
                     </div>
                     
                     <div className="space-y-2">
-                      <Label>Highlights (comma-separated)</Label>
-                      <Input
+                      <Label htmlFor={`education-${item.id}-8`}> Highlights (comma-separated)</Label>
+                      <Input id={`education-${item.id}-8`}
                         placeholder="Summa Cum Laude, Dean's List"
                         value={item.highlights?.join(', ') || ''}
                         onChange={(e) => updateItem(item.id, { 

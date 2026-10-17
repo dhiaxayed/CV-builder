@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
+import { TEMPLATES, resolveTemplateId } from '@/lib/templates'
+import { PRO_CONTACT_URL } from '@/lib/billing/contact'
 import { createEmptyCVData, createSampleCVData } from '@/lib/types/cv'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -16,31 +18,7 @@ import { FileText, ArrowLeft, ArrowRight, Sparkles, PenLine, CheckCircle2, Loade
 
 type Step = 'start' | 'template' | 'title'
 type StartOption = 'scratch' | 'sample'
-const FREE_TIER_CV_LIMIT = 1
-
-// Template definitions - 16 Professional Templates
-const TEMPLATES = [
-  // ATS-Friendly
-  { id: 'modern', name: 'Modern', description: 'Clean ATS-friendly design with great readability', category: 'ats', popular: true },
-  { id: 'classic', name: 'Classic', description: 'Traditional professional layout trusted by recruiters', category: 'ats' },
-  { id: 'minimal', name: 'Minimal', description: 'Simple and elegant design that lets your content shine', category: 'ats' },
-  { id: 'compact', name: 'Compact', description: 'Ultra space-efficient for experienced professionals', category: 'ats' },
-  // Professional
-  { id: 'professional', name: 'Professional', description: 'Executive business design with subtle elegance', category: 'business', popular: true },
-  { id: 'executive', name: 'Executive', description: 'Premium design for C-level and senior management', category: 'business' },
-  { id: 'banking', name: 'Banking', description: 'Corporate minimalist for finance professionals', category: 'business' },
-  { id: 'elegant', name: 'Elegant', description: 'Premium sidebar design with visual hierarchy', category: 'business', popular: true },
-  // Creative
-  { id: 'creative', name: 'Creative', description: 'Modern design with visual appeal for creative roles', category: 'creative' },
-  { id: 'fancy', name: 'Fancy', description: 'Decorative design with stylish colorful accents', category: 'creative' },
-  { id: 'bold', name: 'Bold', description: 'High contrast statement design that stands out', category: 'creative' },
-  { id: 'infographic', name: 'Infographic', description: 'Visual data-driven design with skill bars', category: 'creative', popular: true },
-  // Specialized
-  { id: 'tech', name: 'Tech', description: 'Developer-focused design optimized for technical roles', category: 'tech', popular: true },
-  { id: 'academic', name: 'Academic', description: 'Perfect for researchers, professors, and scientists', category: 'academic' },
-  { id: 'casual', name: 'Casual', description: 'Friendly approachable design for modern companies', category: 'tech' },
-  { id: 'vintage', name: 'Vintage', description: 'Traditional elegant design with classic typography', category: 'classic' },
-]
+import { FREE_TIER_CV_LIMIT } from '@/lib/billing/tier'
 
 export default function NewCVPage() {
   const { user, isLoading } = useAuth()
@@ -49,6 +27,7 @@ export default function NewCVPage() {
   const [step, setStep] = useState<Step>('start')
   const [startOption, setStartOption] = useState<StartOption>('sample')
   const [selectedTemplate, setSelectedTemplate] = useState<string>('modern')
+  useEffect(() => { setSelectedTemplate(resolveTemplateId(new URLSearchParams(window.location.search).get('template'))) }, [])
   const [cvTitle, setCvTitle] = useState('')
   const [isCreating, setIsCreating] = useState(false)
   const [existingCvCount, setExistingCvCount] = useState(0)
@@ -178,7 +157,7 @@ export default function NewCVPage() {
             <CardHeader>
               <CardTitle>Free plan limit reached</CardTitle>
               <CardDescription>
-                Your free plan allows 1 CV. Open your existing CV from the dashboard, delete it, or upgrade to Pro for unlimited CVs.
+                Your free plan allows 1 CV. Open your existing CV from the dashboard or contact us for Pro access. <a className="underline" href={PRO_CONTACT_URL}>Contact Us to Upgrade to Pro</a>. Online payment integration coming soon.
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-3 sm:flex-row sm:justify-end">
@@ -277,7 +256,7 @@ export default function NewCVPage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="text-center">
-                    <RadioGroupItem value="sample" id="sample" className="sr-only" />
+                    <RadioGroupItem value="sample" id="sample" className="peer sr-only" />
                     <span className="text-xs text-muted-foreground">Recommended for first-time users</span>
                   </CardContent>
                 </Card>
@@ -298,7 +277,7 @@ export default function NewCVPage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="text-center">
-                    <RadioGroupItem value="scratch" id="scratch" className="sr-only" />
+                    <RadioGroupItem value="scratch" id="scratch" className="peer sr-only" />
                     <span className="text-xs text-muted-foreground">Full control over your content</span>
                   </CardContent>
                 </Card>
@@ -344,28 +323,26 @@ export default function NewCVPage() {
             >
               {TEMPLATES.map(template => (
                 <Label key={template.id} htmlFor={template.id} className="cursor-pointer">
-                  <RadioGroupItem value={template.id} id={template.id} className="sr-only" />
+                  <RadioGroupItem value={template.id} id={template.id} className="peer sr-only" />
                   <TemplatePreviewCard
                     templateId={template.id}
                     name={template.name}
                     subtitle={template.description}
                     popular={template.popular}
                     selected={selectedTemplate === template.id}
-                    className="h-full"
+                    className="h-full peer-focus-visible:ring-2 peer-focus-visible:ring-primary rounded-xl"
                     footer={
                       <div className="flex items-center gap-2">
                         <span className={cn(
                           'rounded-full px-2 py-0.5 text-xs',
-                          template.category === 'ats' && 'bg-green-100 text-green-700',
-                          template.category === 'classic' && 'bg-amber-100 text-amber-700',
-                          template.category === 'business' && 'bg-blue-100 text-blue-700',
-                          template.category === 'creative' && 'bg-pink-100 text-pink-700',
-                          template.category === 'academic' && 'bg-purple-100 text-purple-700',
-                          template.category === 'tech' && 'bg-cyan-100 text-cyan-700'
+                          template.category === 'ATS-Friendly' && 'bg-green-100 text-green-700',
+                          template.category === 'Professional' && 'bg-blue-100 text-blue-700',
+                          template.category === 'Creative' && 'bg-pink-100 text-pink-700',
+                          template.category === 'Specialized' && 'bg-cyan-100 text-cyan-700'
                         )}>
                           {template.category}
                         </span>
-                        <span className="text-xs text-muted-foreground">ATS-Safe</span>
+                        <span className="text-xs text-muted-foreground">{template.atsNote}</span>
                       </div>
                     }
                   />

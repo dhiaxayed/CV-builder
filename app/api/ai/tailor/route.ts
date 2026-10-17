@@ -1,94 +1,23 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
-import { getSessionUser } from '@/lib/db/users'
-import { getCV, saveJobDescription } from '@/lib/db/cvs'
-import { CVData } from '@/lib/types/cv'
+import { NextResponse } from 'next/server'
+import { z } from 'zod'
+import { getCVWithCurrentVersion, saveJobDescription } from '@/lib/db/cvs'
 import { generateJobTailorAnalysis } from '@/lib/ai/cv-review'
 import { resolveUserTier } from '@/lib/billing/tier'
+import { cvDataSchema } from '@/lib/validation/cv'
+import { requireUser, readJSON, apiError } from '@/lib/server/api'
+import { rateLimit } from '@/lib/server/rate-limit'
+import { AppError } from '@/lib/errors'
 
 export const maxDuration = 60
-
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
-    const cookieStore = await cookies()
-    const sessionToken = cookieStore.get('session')?.value
-
-    if (!sessionToken) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const user = await getSessionUser(sessionToken)
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const userTier = resolveUserTier(user)
-    if (userTier !== 'pro') {
-      return NextResponse.json(
-        {
-          error: 'Job description tailoring is available on Pro plan only.',
-          code: 'PRO_PLAN_REQUIRED',
-        },
-        { status: 403 }
-      )
-    }
-
-    const { cvId, cvData, jobTitle, company, jobDescription, saveToHistory } = (await request.json()) as {
-      cvId?: string
-      cvData?: CVData
-      jobTitle?: string
-      company?: string
-      jobDescription?: string
-      saveToHistory?: boolean
-    }
-
-    if (!cvData || !jobDescription?.trim()) {
-      return NextResponse.json({ error: 'CV data and job description are required' }, { status: 400 })
-    }
-
-    if (cvId) {
-      const cv = await getCV(cvId)
-      if (!cv || cv.user_id !== user.id) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
-      }
-    }
-
-    const result = await generateJobTailorAnalysis({
-      cvData,
-      jobTitle: jobTitle?.trim() || 'Target role',
-      company: company?.trim(),
-      jobDescription,
-      userId: user.id,
-    })
-
-    let savedJobDescriptionId: string | null = null
-
-    if (saveToHistory !== false) {
-      const saved = await saveJobDescription(
-        user.id,
-        cvId || null,
-        jobTitle?.trim() || 'Untitled role',
-        company?.trim() || null,
-        jobDescription,
-        result.extractedKeywords,
-        result.analysis.matchScore
-      )
-
-      savedJobDescriptionId = saved.id
-    }
-
-    return NextResponse.json({
-      ...result,
-      savedJobDescriptionId,
-    })
-  } catch (error) {
-    console.error('[AI Tailor] Error generating tailoring analysis:', error)
-    return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : 'Failed to tailor CV for job description',
-      },
-      { status: 500 }
-    )
-  }
+    const user = await requireUser()
+    if (resolveUserTier(user) !== 'pro') throw new AppError(403,'PRO_PLAN_REQUIRED','Job tailoring requires Pro. Contact us to upgrade.')
+    const body = await readJSON(request,z.object({ cvId:z.string().max(100).optional(),cvData:cvDataSchema,jobTitle:z.string().trim().max(255).default('Target role'),company:z.string().trim().max(255).optional(),jobDescription:z.string().trim().min(20).max(20000),saveToHistory:z.boolean().default(true) }).strict(),550000)
+    if (body.cvId && !await getCVWithCurrentVersion(body.cvId,user.id)) throw new AppError(404,'CV_NOT_FOUND','CV not found')
+    await rateLimit(`ai:${user.id}`,30,3600)
+    const result = await generateJobTailorAnalysis(body)
+    const saved = body.saveToHistory ? await saveJobDescription(user.id,body.cvId || null,body.jobTitle,body.company || null,body.jobDescription,result.extractedKeywords,result.analysis.matchScore) : null
+    return NextResponse.json({ ...result,savedJobDescriptionId:saved?.id || null },{ headers:{ 'Cache-Control':'no-store' } })
+  } catch (error) { return apiError(error) }
 }

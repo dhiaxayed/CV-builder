@@ -1,4 +1,5 @@
 export type UserTier = 'free' | 'pro'
+export const FREE_TIER_CV_LIMIT = 1
 
 type TierSource = {
   plan_tier?: string | null
@@ -14,5 +15,9 @@ export function resolveUserTier(user: TierSource): UserTier {
   }
 
   return 'free'
+}
+
+export function aiRequestLimit(user: TierSource): number {
+  return resolveUserTier(user) === 'pro' ? 30 : 12
 }
 

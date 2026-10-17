@@ -31,6 +31,7 @@ type DbCV = {
   id: string
   title: string
   template_id: string
+  revision: number
   current_version_id: string | null
   versions: DbCVVersion[]
 }
@@ -44,6 +45,7 @@ export default function VersionsPage() {
   const [cv, setCv] = useState<DbCV | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [restoreDialogOpen, setRestoreDialogOpen] = useState(false)
+  const [isRestoring, setIsRestoring] = useState(false)
   const [selectedVersion, setSelectedVersion] = useState<DbCVVersion | null>(null)
   
   useEffect(() => {
@@ -80,29 +82,31 @@ export default function VersionsPage() {
     if (user && params.id) {
       loadVersions()
     }
-  }, [authLoading, user, params.id, router])
+  }, [authLoading, user, params.id, router, toast])
   
   const handleRestore = () => {
-    if (!cv || !selectedVersion) return
+    if (!cv || !selectedVersion || isRestoring) return
+    setIsRestoring(true)
     
     const restoreVersion = async () => {
       try {
         const response = await fetch(`/api/cvs/${cv.id}/versions`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ versionId: selectedVersion.id }),
+          body: JSON.stringify({ versionId: selectedVersion.id, expectedRevision: cv.revision }),
         })
         
         if (!response.ok) {
-          throw new Error('Failed to restore version')
+          const error = await response.json(); throw new Error(error.error || 'Failed to restore version')
         }
         
         const { cv: updated } = await response.json()
-        setCv((prev) => prev ? { ...prev, current_version_id: updated?.current_version_id || selectedVersion.id } : prev)
+        setCv((prev) => prev ? { ...prev, current_version_id: updated?.current_version_id || selectedVersion.id, revision: updated.revision } : prev)
         toast({ title: `Restored to version ${selectedVersion.version}` })
-      } catch {
-        toast({ title: 'Failed to restore version', variant: 'destructive' })
+      } catch (error) {
+        toast({ title: error instanceof Error ? error.message : 'Failed to restore version', variant: 'destructive' })
       } finally {
+        setIsRestoring(false)
         setRestoreDialogOpen(false)
         setSelectedVersion(null)
       }
@@ -186,11 +190,11 @@ export default function VersionsPage() {
                       {isActive && (
                         <Badge className="bg-primary">
                           <CheckCircle2 className="h-3 w-3 mr-1" />
-                          Current
+                          Last snapshot
                         </Badge>
                       )}
                     </div>
-                    {!isActive && (
+                    {(
                       <Button
                         variant="outline"
                         size="sm"
@@ -245,7 +249,7 @@ export default function VersionsPage() {
             <Button variant="outline" onClick={() => setRestoreDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleRestore}>
+            <Button onClick={handleRestore} disabled={isRestoring}>
               Restore Version
             </Button>
           </DialogFooter>

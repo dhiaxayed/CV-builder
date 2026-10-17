@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:20-bookworm-slim AS base
+FROM node:22-bookworm-slim AS base
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 RUN corepack enable
@@ -8,11 +8,13 @@ RUN corepack enable
 FROM base AS deps
 WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
+COPY scripts/install-tectonic-runtime-libs.mjs ./scripts/install-tectonic-runtime-libs.mjs
 RUN pnpm install --frozen-lockfile
 
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/vendor ./vendor
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm build
@@ -20,9 +22,10 @@ RUN pnpm build
 FROM base AS prod-deps
 WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
+COPY scripts/install-tectonic-runtime-libs.mjs ./scripts/install-tectonic-runtime-libs.mjs
 RUN pnpm install --frozen-lockfile --prod
 
-FROM node:20-bookworm-slim AS runner
+FROM node:22-bookworm-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -37,6 +40,7 @@ RUN apt-get update \
       texlive-fonts-recommended \
       fonts-dejavu \
       fonts-liberation \
+      lmodern \
     ; rm -rf /var/lib/apt/lists/*
 
 RUN groupadd --gid 1001 nodejs \
@@ -51,6 +55,7 @@ COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/next.config.mjs ./next.config.mjs
+COPY --from=builder /app/vendor ./vendor
 
 USER nextjs
 EXPOSE 3000

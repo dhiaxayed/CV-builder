@@ -58,18 +58,18 @@ export function SectionCertifications({ data = [], onChange }: SectionCertificat
         ) : (
           safeData.map((item) => (
             <div key={item.id} className="border rounded-lg p-4 space-y-3">
-              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Certification Name</Label>
-                  <Input
+                  <Label htmlFor={`certifications-${item.id}-1`}> Certification Name</Label>
+                  <Input id={`certifications-${item.id}-1`}
                     placeholder="AWS Solutions Architect"
                     value={item.name}
                     onChange={(e) => updateItem(item.id, { name: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Issuing Organization</Label>
-                  <Input
+                  <Label htmlFor={`certifications-${item.id}-2`}> Issuing Organization</Label>
+                  <Input id={`certifications-${item.id}-2`}
                     placeholder="Amazon Web Services"
                     value={item.issuer}
                     onChange={(e) => updateItem(item.id, { issuer: e.target.value })}
@@ -78,21 +78,25 @@ export function SectionCertifications({ data = [], onChange }: SectionCertificat
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Issue Date</Label>
-                  <Input
+                  <Label htmlFor={`certifications-${item.id}-3`}> Issue Date</Label>
+                  <Input id={`certifications-${item.id}-3`}
                     type="month"
                     value={item.date}
                     onChange={(e) => updateItem(item.id, { date: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Expiration Date (optional)</Label>
-                  <Input
+                  <Label htmlFor={`certifications-${item.id}-4`}> Expiration Date (optional)</Label>
+                  <Input id={`certifications-${item.id}-4`}
                     type="month"
                     value={item.expirationDate || ''}
                     onChange={(e) => updateItem(item.id, { expirationDate: e.target.value })}
                   />
                 </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor={`cert-${item.id}-url`}>Credential URL</Label>
+                <Input id={`cert-${item.id}-url`} value={item.url || ''} maxLength={500} placeholder="https://example.com/credential" onChange={event => updateItem(item.id, { url:event.target.value })} />
               </div>
               <div className="flex justify-end">
                 <Button 

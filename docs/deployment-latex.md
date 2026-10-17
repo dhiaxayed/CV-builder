@@ -1,65 +1,27 @@
-# LaTeX PDF deployment
+# PDF runtime and source exports
 
-PDF export is intentionally LaTeX-only. The app generates `.tex`, compiles it with a real LaTeX engine, and returns the compiled PDF.
-
-## Required runtime
-
-The production runtime must provide one real LaTeX engine:
-
-- `pdflatex`
-- `xelatex`
-- bundled `tectonic` via `node-latex-compiler`
-
-`LATEX_CMD` only selects a system command to execute. It does not install `pdflatex` or `xelatex`.
+PDF generation uses one LaTeX renderer for preview, private export and published CVs. All sixteen templates share the same validated data contract and bounded layout policy. There is no alternate JavaScript PDF fallback.
 
 ## Vercel
 
-Vercel serverless functions do not include a TeX Live system install, so calling `pdflatex` directly fails with:
+Use `LATEX_RENDERER=tectonic` with Node.js 22.x. Linux `postinstall` installs the official portable musl Tectonic 0.16.9 executable, verifying the release SHA-256 before extraction. Windows uses the matching official version for local verification. `pnpm build` compiles the sixteen designs with both typeface choices and a synthetic photo, preparing a cache of the exact resources needed. The cache is an ignored build artifact containing only packages/fonts and synthetic compilation resources. Next's tracing includes that executable and the dynamic `pdf-parse` workers in both PDF routes. Run `pnpm build` and `pnpm check:bundles`; CI verifies the Linux native asset too. See [VERCEL.md](../VERCEL.md) for environment and rollout requirements.
 
-```text
-spawn pdflatex ENOENT
-```
+Each compilation uses a unique temporary directory, disabled shell escape/untrusted mode, bounded logs and a 45-second process timeout. Prepared packages/fonts are shipped with the functions, copied to the OS temporary directory once per process and used with `--only-cached`. Package downloads happen during the build; a missing prepared cache in a local setup retains a bounded network-capable fallback. The function has a 300-second duration allowance, but actual Vercel project limits still apply. A successful local MiKTeX/TeX Live compilation does not validate the deployed Linux Tectonic runtime.
 
-For Vercel, use the bundled Tectonic renderer:
+## Layout and portability
 
-```env
-LATEX_RENDERER=tectonic
-```
+The prepared working set covers all sixteen templates, both typefaces and all three density levels, including a synthetic photo. Missing-glyph warnings are treated as export errors: unsupported characters cannot silently disappear from a valid PDF.
 
-Do not set `LATEX_CMD=pdflatex` on Vercel unless you intentionally want to test the missing system binary path.
+The renderer counts actual PDF pages and checks TeX overfull boxes. It tries normal, compact and dense layouts without discarding text, reducing body type below 9.5 pt or margins below 12 mm. Strict one-page overflow returns 422 with the largest sections; users can shorten content or explicitly select multi-page output. Unsupported scripts/fonts can fail clearly and need a dedicated font configuration; Latin accents are tested.
 
-Tectonic is a real LaTeX engine. The first cold compile can be slower because packages may be initialized/downloaded by the engine.
+PDF and source downloads use the chosen compiled density. The editor's source view uses the latest successful preview density for the same data/template, otherwise the base layout. A `.tex` document with a photo references the auxiliary `cv_photo.png`; the raw source alone does not bundle that image. Portable JSON embeds the photo and can reproduce it through the application. No claim is made that a raw photo-containing `.tex` is a standalone archive.
 
-On Vercel this repository installs the official Linux musl Tectonic binary during `postinstall` into `vendor/tectonic-linux-x64/bin`. The musl binary avoids GLIBC version problems in Vercel serverless functions.
+## Existing system-engine support
 
-## Docker/VPS
+For local/CI or the repository's existing optional Docker setup, `LATEX_RENDERER=system` requires `pdflatex` or `xelatex`. `LATEX_CMD` selects an executable; it never installs one. `auto` tries system engines before Tectonic. Required packages include Latin Modern, geometry, hyperref, titlesec, enumitem, tabularx, needspace, ragged2e, graphicx and paracol. Vercel remains the production deployment target.
 
-The included `Dockerfile` installs TeX Live packages required for the PDF renderer. In Docker production, prefer:
+## Verification
 
-```env
-LATEX_RENDERER=auto
-LATEX_CMD=xelatex
-```
+CI runs `pnpm test:pdf` against TeX Live and again against bundled Tectonic with its prepared cache. `pnpm test:pdf` compiles every design, checks text/links/photo/special characters, compares raster output with published thumbnails, rejects excessive one-page content and verifies explicit multi-page preservation. `python scripts/check-pdf-layout.py` checks actual character positions in the sixteen generated PDFs. `pnpm templates:generate` refreshes the real PDF thumbnails and their source hash using production Tectonic. System-engine checks validate portability; pixel comparison is performed against Tectonic output.
 
-## Modes
-
-```env
-# Try system pdflatex/xelatex, then Tectonic fallback.
-LATEX_RENDERER=auto
-
-# Use only pdflatex/xelatex from the server.
-LATEX_RENDERER=system
-
-# Use bundled Tectonic only. Recommended for Vercel.
-LATEX_RENDERER=tectonic
-```
-
-If `LATEX_RENDERER=system`, the production runtime must have `pdflatex` or `xelatex` installed.
-
-Check runtime readiness with:
-
-```text
-/api/health
-```
-
-The `latex.available` field must be `true` before PDF export can work.
+`/api/health` is liveness only. Readiness requires an authenticated real PDF request on the deployed runtime, followed by page-count/text/visual inspection. Engine discovery or `--version` output is insufficient.

@@ -1,38 +1,34 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '@playwright/test'
+import { loginUser } from './utils'
 
-test.describe('Authentication Flow', () => {
-    test('should allow user to login via magic link (dev mode)', async ({ page }) => {
-        // 1. Visit login page
-        await page.goto('/auth/signin');
-
-        // 2. Fill in email
-        const email = 'testuser@example.com';
-        await page.fill('input[type="email"]', email);
-
-        // 3. Intercept the API call to capture the devLink
-        const apiResponsePromise = page.waitForResponse(response =>
-            response.url().includes('/api/auth/send-magic-link') && response.status() === 200
-        );
-
-        // 4. Click submit
-        await page.click('button[type="submit"]');
-
-        // 5. Get the response body
-        const response = await apiResponsePromise;
-        const data = await response.json();
-
-        // Check if we got the devLink (only available in NODE_ENV=development)
-        // Note: The app must be running in development mode for this to work.
-        expect(data.success).toBe(true);
-        expect(data.devLink).toBeTruthy();
-
-        // 6. Navigate to the verification link
-        await page.goto(data.devLink);
-
-        // 7. Verify we are redirected to dashboard
-        await expect(page).toHaveURL(/\/dashboard/);
-
-        // Optional: Check for some dashboard element
-        await expect(page.locator('h1')).toContainText('Welcome');
-    });
-});
+test('anonymous and invalid-cookie access redirects predictably',async ({ page,request }) => {
+  await page.goto('/cv/new?template=elegant')
+  await expect(page).toHaveURL(/auth\/signin\?redirect=/)
+  const result = await request.get('/api/cvs')
+  expect(result.status()).toBe(401)
+  expect((await request.post('/api/auth/send-magic-link',{ headers:{ Origin:'https://attacker.invalid' },data:{ email:'x@example.invalid' } })).status()).toBe(403)
+})
+test('real magic-link sign-in, expiry and sign-out invalidate protected operations',async ({ page }) => {
+  const email = await loginUser(page)
+  expect((await page.request.get('/api/cvs')).status()).toBe(200)
+  await page.request.post('http://127.0.0.1:3002/__test/expire',{ data:{ email } })
+  expect((await page.request.get('/api/cvs')).status()).toBe(401)
+  await page.goto('/dashboard')
+  await expect(page).toHaveURL(/auth\/signin/)
+  await loginUser(page)
+  expect((await page.request.delete('/api/auth/session')).status()).toBe(200)
+  expect((await page.request.get('/api/cvs')).status()).toBe(401)
+})
+test('touch-sized gallery has visible template controls and a genuine Pro email CTA',async ({ page }) => {
+  await page.setViewportSize({ width:390,height:844 })
+  await page.goto('/')
+  const useTemplate = page.getByRole('button',{ name:'Use Template: Elegant',exact:true })
+  await useTemplate.scrollIntoViewIfNeeded()
+  await expect(useTemplate).toBeVisible()
+  const upgrade = page.getByRole('link',{ name:'Contact Us to Upgrade to Pro',exact:true })
+  await expect(upgrade).toHaveAttribute('href',/^mailto:dhiaayed03@gmail.com\?subject=/)
+  await expect(page.getByText('Online payment integration coming soon.')).toBeVisible()
+  await useTemplate.click()
+  await expect(page).toHaveURL(/template%3Delegant/)
+  await page.screenshot({ path:'test-results/mobile-signin.png',fullPage:true })
+})

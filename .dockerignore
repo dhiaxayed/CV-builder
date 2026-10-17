@@ -30,3 +30,8 @@ test_output.txt
 # OS files
 .DS_Store
 Thumbs.db
+
+output
+tmp
+test_output_audit.json
+vendor

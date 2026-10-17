@@ -1,9 +1,11 @@
 'use client'
 
 import React from "react"
+import Image from 'next/image'
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { PRO_CONTACT_URL } from '@/lib/billing/contact'
 import { useAuth } from '@/lib/auth-context'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -41,43 +43,36 @@ import {
   Shield,
   FileSearch,
 } from 'lucide-react'
-import type { CVData } from '@/lib/db'
 
-const FREE_TIER_CV_LIMIT = 1
+import { FREE_TIER_CV_LIMIT } from '@/lib/billing/tier'
 
-type CVWithVersion = {
+type DashboardCV = {
   id: string
   user_id: string
   title: string
+  draft_name: string
+  draft_title: string
   template_id: string
   current_version_id: string | null
   is_public: boolean
   share_token: string | null
   created_at: string
   updated_at: string
-  current_version?: {
-    id: string
-    cv_id: string
-    version: number
-    data: CVData
-    note: string | null
-    created_at: string
-  }
 }
 
 export default function DashboardPage() {
   const { user, isLoading: authLoading, signOut } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
-  const [cvs, setCvs] = useState<CVWithVersion[]>([])
+  const [cvs, setCvs] = useState<DashboardCV[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false)
-  const [selectedCV, setSelectedCV] = useState<CVWithVersion | null>(null)
+  const [selectedCV, setSelectedCV] = useState<DashboardCV | null>(null)
   const [duplicateTitle, setDuplicateTitle] = useState('')
   const [isDeleting, setIsDeleting] = useState(false)
   const [isDuplicating, setIsDuplicating] = useState(false)
-  
+
   const fetchCVs = useCallback(async () => {
     try {
       const response = await fetch('/api/cvs')
@@ -91,23 +86,23 @@ export default function DashboardPage() {
       setIsLoading(false)
     }
   }, [])
-  
+
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/auth/signin')
     }
   }, [authLoading, user, router])
-  
+
   useEffect(() => {
     if (user) {
       fetchCVs()
     }
   }, [user, fetchCVs])
-  
+
   const handleDelete = async () => {
     if (!selectedCV) return
     setIsDeleting(true)
-    
+
     try {
       const response = await fetch(`/api/cvs/${selectedCV.id}`, { method: 'DELETE' })
       if (response.ok) {
@@ -124,11 +119,11 @@ export default function DashboardPage() {
       setSelectedCV(null)
     }
   }
-  
+
   const handleDuplicate = async () => {
     if (!selectedCV || !duplicateTitle) return
     setIsDuplicating(true)
-    
+
     try {
       const response = await fetch(`/api/cvs/${selectedCV.id}/duplicate`, {
         method: 'POST',
@@ -157,7 +152,7 @@ export default function DashboardPage() {
       setDuplicateTitle('')
     }
   }
-  
+
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('en-US', {
       month: 'short',
@@ -165,7 +160,7 @@ export default function DashboardPage() {
       year: 'numeric',
     })
   }
-  
+
   if (authLoading || isLoading) {
     return (
       <div className="min-h-screen bg-background">
@@ -185,11 +180,11 @@ export default function DashboardPage() {
       </div>
     )
   }
-  
+
   if (!user) return null
 
   const isFreeTierLimitReached = user.tier === 'free' && cvs.length >= FREE_TIER_CV_LIMIT
-  
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -199,7 +194,7 @@ export default function DashboardPage() {
             <FileText className="h-6 w-6 text-primary" />
             <span className="text-xl font-bold">CV Builder</span>
           </div>
-          
+
           <div className="flex items-center gap-4">
             <span className="text-sm text-muted-foreground hidden sm:inline">
               {user.email}
@@ -211,7 +206,7 @@ export default function DashboardPage() {
           </div>
         </div>
       </header>
-      
+
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
@@ -222,7 +217,7 @@ export default function DashboardPage() {
             </p>
             {isFreeTierLimitReached && (
               <p className="mt-2 text-sm text-amber-700">
-                Free plan allows 1 CV. Delete your current CV or upgrade to Pro to create another one.
+                Free plan allows 1 CV. Contact us for Pro to create more. <a href={PRO_CONTACT_URL} className="underline">Contact Us to Upgrade to Pro</a>. Online payment integration coming soon.
               </p>
             )}
           </div>
@@ -282,7 +277,7 @@ export default function DashboardPage() {
             </div>
           </CardContent>
         </Card>
-        
+
         {cvs.length === 0 ? (
           <Card className="border-dashed">
             <CardContent className="flex flex-col items-center justify-center py-16">
@@ -304,8 +299,7 @@ export default function DashboardPage() {
         ) : (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {cvs.map(cv => {
-              const currentVersion = cv.current_version
-              
+
               return (
                 <Card key={cv.id} className="group hover:shadow-md transition-shadow">
                   <CardHeader className="pb-2">
@@ -327,7 +321,7 @@ export default function DashboardPage() {
                             <Pencil className="h-4 w-4 mr-2" />
                             Edit
                           </DropdownMenuItem>
-                          <DropdownMenuItem 
+                          <DropdownMenuItem
                             disabled={isFreeTierLimitReached}
                             onClick={() => {
                               setSelectedCV(cv)
@@ -363,28 +357,23 @@ export default function DashboardPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="aspect-3/4 bg-muted rounded-md overflow-hidden mb-3">
-                    <img
-                      src={`/templates/${cv.template_id}.svg`}
-                      alt={`${cv.title} template preview`}
-                      loading="lazy"
-                      className="h-full w-full object-cover"
-                      onError={(e) => {
-                        e.currentTarget.src = '/templates/modern.svg'
-                      }}
+                    <Image
+                      src={`/templates/${cv.template_id}.webp`}
+                      alt={`${cv.title}: sample of the selected template`}
+                      width={650} height={920} loading="lazy"
+                      className="h-full w-full object-contain"
                     />
                   </div>
                   <div className="space-y-3">
-                      {currentVersion && (
+                      {cv.draft_name && (
                         <div className="text-sm text-muted-foreground">
                           <p className="font-medium text-foreground">
-                            {currentVersion.data.basics?.name || 'Untitled'}
+                            {cv.draft_name || 'Untitled'}
                           </p>
-                          {currentVersion.data.basics?.contact?.email && (
-                            <p>{currentVersion.data.basics.contact.email}</p>
-                          )}
+                          {cv.draft_title && <p>{cv.draft_title}</p>}
                         </div>
                       )}
-                      
+
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <Clock className="h-3 w-3" />
@@ -394,9 +383,9 @@ export default function DashboardPage() {
                           <span className="text-green-600">Shared</span>
                         )}
                       </div>
-                      
-                      <Button 
-                        variant="outline" 
+
+                      <Button
+                        variant="outline"
                         className="w-full bg-transparent"
                         onClick={() => router.push(`/cv/${cv.id}/edit`)}
                       >
@@ -411,7 +400,7 @@ export default function DashboardPage() {
           </div>
         )}
       </main>
-      
+
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent>
@@ -431,7 +420,7 @@ export default function DashboardPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      
+
       {/* Duplicate Dialog */}
       <Dialog open={duplicateDialogOpen} onOpenChange={setDuplicateDialogOpen}>
         <DialogContent>

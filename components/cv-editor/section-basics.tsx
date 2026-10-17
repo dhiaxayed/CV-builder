@@ -1,5 +1,7 @@
 'use client'
 
+import { MAX_PHOTO_BYTES } from '@/lib/photos'
+
 import { useState, useRef } from 'react'
 import { Basics } from '@/lib/types/cv'
 import { Input } from '@/components/ui/input'
@@ -14,9 +16,10 @@ interface SectionBasicsProps {
   data: Basics
   onChange: (data: Basics) => void
   cvId?: string
+  onPhotoUpload?: (file: File) => Promise<void>
 }
 
-export function SectionBasics({ data, onChange, cvId }: SectionBasicsProps) {
+export function SectionBasics({ data, onChange, onPhotoUpload }: SectionBasicsProps) {
   const [isUploading, setIsUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
@@ -52,33 +55,18 @@ export function SectionBasics({ data, onChange, cvId }: SectionBasicsProps) {
       return
     }
     
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast({ title: 'Image must be less than 5MB', variant: 'destructive' })
+    // Match the server limit before uploading.
+    if (file.size > MAX_PHOTO_BYTES) {
+      toast({ title: 'Image must be less than 4MB', variant: 'destructive' })
       return
     }
     
     setIsUploading(true)
     
     try {
-      const formData = new FormData()
-      formData.append('photo', file)
-      formData.append('target', 'cv')
-      if (cvId) formData.append('cvId', cvId)
-      
-      const response = await fetch('/api/upload/photo', {
-        method: 'POST',
-        body: formData,
-      })
-      
-      if (response.ok) {
-        const result = await response.json()
-        onChange({ ...data, photoUrl: result.url })
-        toast({ title: 'Photo uploaded successfully!' })
-      } else {
-        const error = await response.json()
-        throw new Error(error.message || 'Upload failed')
-      }
+      if (!onPhotoUpload) throw new Error('Photo uploads are available in the CV editor.')
+      await onPhotoUpload(file)
+      toast({ title: 'Photo uploaded successfully!' })
     } catch (error) {
       toast({ 
         title: error instanceof Error ? error.message : 'Failed to upload photo', 
@@ -96,19 +84,6 @@ export function SectionBasics({ data, onChange, cvId }: SectionBasicsProps) {
     setIsUploading(true)
     
     try {
-      if (cvId) {
-        const response = await fetch('/api/upload/photo', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ target: 'cv', cvId }),
-        })
-        
-        if (!response.ok) {
-          const error = await response.json().catch(() => ({}))
-          throw new Error(error.message || 'Failed to remove photo')
-        }
-      }
-      
       onChange({ ...data, photoUrl: undefined })
       toast({ title: 'Photo removed' })
     } catch (error) {
@@ -151,7 +126,7 @@ export function SectionBasics({ data, onChange, cvId }: SectionBasicsProps) {
           <div className="flex-1">
             <p className="text-sm font-medium mb-1">Profile Photo</p>
             <p className="text-xs text-muted-foreground mb-3">
-              Add a professional photo to make your CV stand out. JPG, PNG up to 5MB.
+              Add a professional photo to make your CV stand out. JPEG, PNG or WebP up to 4MB.
             </p>
             <div className="flex gap-2">
               <input

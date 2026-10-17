@@ -1,0 +1,153 @@
+# Rapport d'ingénierie — CV Builder
+
+État de vérification : 17 octobre 2026. Travail effectué dans le dépôt local ; aucun déploiement ni migration de production exécutés. Vercel reste la cible de production.
+
+## A. Synthèse
+
+Les corrections couvrent la sécurité des données, les sessions, les sauvegardes concurrentes, l'historique, les photos, le partage, l'IA et les seize modèles LaTeX. Le contenu validé constitue une source commune pour l'éditeur, les versions, l'IA et les exports. Les modifications sont implémentées, avec des tests exécutables et une procédure de déploiement coordonnée.
+
+L'IA réelle OpenRouter a été vérifiée avec la configuration existante et des CV fictifs : analyse, adaptation et condensation renvoient des réponses structurées. Un parcours navigateur réel vérifie aussi application d'une suggestion, persistance et annulation. Les modèles disposent de structures distinctes, de six palettes supplémentaires et de deux familles typographiques personnalisables.
+
+La certification du Supabase et du runtime Vercel déployés nécessite encore les contrôles décrits en H. Un résultat local vert ne constitue pas une affirmation de fiabilité absolue en production.
+
+## B. Constats vérifiés et corrections
+
+| Constat et cause | Fichiers principaux | Correction | Preuve |
+| --- | --- | --- | --- |
+| Le module IA initial contenait deux implémentations concaténées et des erreurs de syntaxe | `lib/ai/cv-review.ts` | Conservation de l'implémentation cohérente, suppression du bloc dupliqué et des imports invalides | Échec TypeScript initial reproduit ; typecheck final vert |
+| Les scripts du dépôt ne protégeaient pas les tables privées par RLS/grants ; le client serveur acceptait une clé publique comme repli | `scripts/003-security-and-drafts.sql`, `lib/db/index.ts` | RLS, révocation des rôles navigateur et client privilégié exclusivement serveur, sans repli public | Tests SQL des rôles et refus des RPC ; le statut du projet Supabase distant reste à contrôler |
+| Vérification et consommation des liens de connexion n'étaient pas atomiques | `lib/db/users.ts`, migration 003 | Consommation conditionnelle en une instruction PostgreSQL, hachage des tokens, expiration et invalidation de session | Rejeu, expiration et requêtes concurrentes testés |
+| La présence d'un cookie pouvait remplacer la validation de session | `proxy.ts`, routes d'authentification | Session vérifiée, cookie invalide supprimé, redirections internes contrôlées et mutations de même origine | Parcours connexion/expiration/déconnexion et origine hostile |
+| Les écritures d'éditeur pouvaient acquitter un état plus récent que la requête réellement sauvegardée | `lib/autosave.ts`, éditeur | File sérialisée, numéro de révision attendu, acquittement de l'édition capturée, reprise et conflit visible | Édition pendant sauvegarde retardée, panne réseau, retry et conflits |
+| Le contenu courant réutilisait des lignes d'historique modifiables | migration 003, `lib/db/cvs.ts` | Brouillon distinct, snapshots immuables, restauration par copie et verrouillage de ligne | V1/V2/V3 conservées après restauration, modifications et V4 ; trigger anti-modification |
+| Création, V1 et limite Free reposaient sur des opérations séparées | migration 003 | Verrou du propriétaire et transaction unique ; duplication par la même opération | Créations concurrentes, limite Free et cohérence de V1 |
+| Les réponses publiques exposaient des métadonnées internes et le partage suivait les modifications privées | routes de partage, `publish_cv` | DTO explicite et copie publiée figée ; révocation avec nouveau token lors de la réactivation | Métadonnées absentes, brouillon privé, JSON/PDF/photos refusés après révocation |
+| Des champs du schéma ne disposaient pas d'édition complète | sections Awards/Custom, projets/certifications, `lib/validation/cv.ts` | CRUD, dates/liens et contrat commun dont les types sont dérivés | Édition, sauvegarde, versions et extraction PDF des sections |
+| Les photos nécessitaient des contrôles de format, décodeur, taille et persistance cohérente | upload/photo, photos, migration 004 | Signature/MIME, décodage Sharp, 16 mégapixels, limite 4 MiB adaptée à Vercel, fichier référencé et transaction | Fichiers falsifiés, mauvais MIME, pixels excessifs, formulaire invalide, taille et accès public/privé |
+| Les aperçus illustrés ne représentaient pas les exports et des générateurs n'étaient pas utilisés | catalogue, générateur, thumbnails | Seize conceptions actives et aperçus WEBP issus du PDF Tectonic réel | Compilation, texte, liens, comparaison raster et hash des sources |
+| Le format une page n'était pas garanti par une mesure du résultat | `lib/pdf/render.ts` | Comptage réel, trois densités bornées, corps ≥ 9,5 pt et marges ≥ 12 mm ; erreur explicite ou choix multipage | Seize cas normaux, seize débordements et conservation de la dernière entrée en multipage |
+| La configuration OpenRouter existante n'était pas utilisée par l'adaptateur Groq | `lib/ai/provider.ts` | Un adaptateur commun, Groq prioritaire si les deux clés existent, source et secours explicitement identifiés | Contrats simulés des deux fournisseurs et appels OpenRouter réels |
+| Nemotron dépassait le délai malgré une clé valide | adaptateur IA | Désactivation du raisonnement prolongé pour les tâches d'édition structurée, délais et réparation JSON bornés | Délais initiaux de 10/25 s reproduits, puis trois actions réelles et parcours navigateur réussis |
+| Des suggestions pouvaient réaffecter des compétences ou modifier/omettre des métriques | `lib/ai/grounding.ts`, `lib/keywords.ts` | Vocabulaire partagé, comparaison de métriques entières, preuves par emploi, IDs/rôles exacts, ordre et nombre de puces conservés | Tests de métriques, compétences non prouvées et suggestions rejetées ; revue humaine toujours requise |
+| Les fonctions PDF pouvaient omettre le worker dynamique et embarquer d'anciens documents temporaires | `next.config.mjs`, vérification des bundles | Inclusion des workers/runtime/cache ; exclusion des PDF, sorties QA, tests et fichiers temporaires | Vérification des traces privées/publiques, absence de fichiers `.env` et documents |
+| Une compilation Tectonic à froid téléchargeait trop de ressources ; un timeout Windows pouvait masquer l'erreur par EBUSY | compilateur et préparation du cache | Préparation des packages/polices pendant la build, copie vers `/tmp`, compilation hors ligne ; attente de fermeture native avant nettoyage | Cache réel des seize modèles/deux polices/photo et contrôles Tectonic |
+| XeTeX pouvait produire un PDF valide en omettant un caractère absent de la police | `lib/pdf/compiler.ts` | Détection des avertissements de glyphes manquants et erreur 422 explicite | Omission d'un caractère reproduite, puis refus testé sur les deux moteurs |
+
+Améliorations préventives distinctes des anomalies reproduites : quotas PostgreSQL partagés entre instances, validation de taille des flux, réduction des DTO, diagnostic sans contenus privés, mise à jour des dépendances, configuration serveur Supabase utilisable à l'exécution et CI. Aucune exposition de données du Supabase déployé n'est affirmée sans inspection de ses politiques effectives.
+
+## C. Architecture
+
+```mermaid
+flowchart LR
+  Editor[Éditeur] --> Queue[File de sauvegarde et révision]
+  Queue --> API[API authentifiée et propriétaire]
+  API --> Draft[Brouillon PostgreSQL]
+  Draft --> History[Snapshot immuable]
+  History -->|Restaurer par copie| Draft
+  Draft --> Published[Copie publiée figée]
+  Draft --> Renderer[LaTeX et PDF mesuré]
+  Published --> Renderer
+```
+
+Le contenu, le titre et le modèle traversent la même file de sauvegarde. Les préférences de style appartiennent au contenu et suivent automatiquement versions, restauration, partage et exports. Le téléchargement PDF attend les sauvegardes et exige la bonne révision serveur ; l'aperçu compile le contenu local avec les mêmes règles. Une réponse devenue obsolète ne remplace pas un aperçu plus récent.
+
+La compilation utilise des répertoires temporaires uniques, aucun shell escape, des logs bornés, un temps limité et un cache de résultats de petite taille. Les ressources LaTeX préparées sont distinctes des documents utilisateur. Le cache de paquets peut être empaqueté ; les PDF temporaires ne le peuvent pas.
+
+## D. Base de données et déploiement
+
+- Prérequis : migrations 001 et 002, sauvegarde et environnement de staging.
+- Migration 003 : brouillon/révision/contenu publié, conservation de l'existant, tokens hachés, RLS/grants, quotas et transactions atomiques de création/sauvegarde/version/restauration/publication.
+- Migration 004 : fichier photo et référence CV/profil sauvegardés dans une transaction.
+- Contrôle privilégié en lecture seule : `scripts/verify-security.sql`. Contrôles applicatifs : `pnpm db:check` et `pnpm db:check:public`.
+- Coordiner migration et déploiement ; les anciennes versions de l'application ne doivent plus écrire après migration. Un retour du seul code vers l'ancien système est dangereux pour l'historique et les tokens. Préférer une correction en avant ou une restauration coordonnée des sauvegardes en réconciliant les modifications ultérieures.
+
+Le test distant avec la clé publique a effectué uniquement des sélections `LIMIT 0`, sans récupérer de données privées : neuf tables ont répondu sans refus SQL explicite, ce qui est **inconclusif** quant à la protection par RLS. `rate_limits` a renvoyé `PGRST205` (absente ou non exposée). Ce contrôle n'a donc pas été déclaré réussi et ne remplace pas la vérification SQL.
+
+Les clés déjà configurées dans Vercel ne sont pas modifiées. Le client serveur accepte l'URL privée optionnelle `SUPABASE_URL`, puis l'URL publique existante ; la clé de service demeure obligatoire. Voir [la procédure de déploiement](../VERCEL.md) et [la reprise détaillée](hardening-deployment.md).
+
+## E. IA
+
+Le fournisseur reçoit le contenu professionnel utile, sans photo ni bloc de coordonnées personnelles. Les réponses sont validées par Zod, avec une seule réparation structurelle, des tentatives HTTP limitées et un budget de temps global. Les erreurs exposées sont rédigées par l'application ; les contenus/diagnostics bruts du fournisseur ne sont pas journalisés.
+
+Le contrôle CLI réel a mesuré environ 14,6 s pour l'analyse, 11,0 s pour l'adaptation avec deux réécritures acceptées, et 3,5 s pour la condensation. Un repli intermittent a aussi été observé pendant les essais navigateur : les erreurs transitoires et timeouts sont désormais repris une fois dans le budget global, sans prolongation illimitée. Le dernier parcours navigateur réel a réussi les trois actions, application, sauvegarde et annulation. Ces mesures ponctuelles ne constituent pas un engagement de latence du fournisseur.
+
+Les compétences proposées doivent être présentes dans les preuves du candidat. Les réécritures doivent référencer le bon emploi et conserver ses métriques, son nombre de puces et leur ordre. Les propositions rejetées restent exclues et sont signalées. La condensation ne remplace pas automatiquement le contenu. Application sélective, sauvegarde et annulation ont été testées ; l'annulation conserve les éditions manuelles faites après la proposition.
+
+Les scores restent des estimations de contenu, non une certification ATS ou une probabilité d'embauche. Le secours déterministe est étiqueté et ne fabrique pas d'expérience. Les filtres ne constituent pas une preuve sémantique exhaustive : la comparaison humaine des formulations reste nécessaire. Les permissions Pro sont vérifiées par le serveur ; le contact `dhiaayed03@gmail.com` n'accorde aucun abonnement et aucun faux paiement n'est ajouté.
+
+## F. Modèles et PDF
+
+Moteur canonique des aperçus : Tectonic 0.16.9, même version officielle sur Windows pour ces vérifications et Linux pour Vercel. Les archives sont vérifiées par SHA-256. Le cache de build compile chaque modèle avec les deux familles typographiques et une photo ; les fonctions utilisent ensuite les ressources préparées hors ligne.
+
+| Modèle | Structure dominante | PDF de référence | Densité retenue | Aperçu |
+| --- | --- | --- | --- | --- |
+| Modern | Colonne unique, titres contemporains et filets | 1 page | compact | PDF réel |
+| Classic | En-tête centré, serif et petites capitales | 1 page | compact | PDF réel |
+| Minimal | Hiérarchie sobre sans décoration superflue | 1 page | dense | PDF réel |
+| Compact | En-tête large et espacement efficace | 1 page | normal | PDF réel |
+| Professional | Composition professionnelle centrée, sections structurées | 1 page | dense | PDF réel |
+| Executive | Grand masthead serif à double filet | 1 page | dense | PDF réel |
+| Banking | Identité à gauche, coordonnées à droite, hiérarchie conservatrice | 1 page | compact | PDF réel |
+| Elegant | Composition serif raffinée avec colonne latérale | 1 page | normal | PDF réel |
+| Creative | Composition asymétrique sans serif et marqueurs | 1 page | compact | PDF réel |
+| Fancy | En-tête encadré, petites capitales et accent décoratif | 1 page | compact | PDF réel |
+| Bold | Bandeau contrasté et forte hiérarchie typographique | 1 page | compact | PDF réel |
+| Infographic | Groupes d'information sur deux colonnes et bandeau | 1 page | normal | PDF réel |
+| Tech | Compétences/projets en premier, signature monospace | 1 page | normal | PDF réel |
+| Academic | Formation et réalisations académiques en premier | 1 page | dense | PDF réel |
+| Casual | En-tête centré, sans serif et titres sobres | 1 page | dense | PDF réel |
+| Vintage | Masthead traditionnel et petites capitales serif | 1 page | dense | PDF réel |
+
+Chaque cas normal comporte expérience, formation, compétences, projets, certifications, récompenses, langues et section personnalisée, avec accents et liens. Les exemples excessifs sont refusés en une page, sans troncature. L'export multipage est explicite. Les modèles à plusieurs colonnes portent un avertissement sur l'ordre de lecture ATS.
+
+Les six palettes supplémentaires et les choix serif/sans serif sont indépendants du modèle. La source `.tex` utilise la densité compilée ; avec une photo, elle référence le fichier auxiliaire `cv_photo.png`. L'export JSON embarque la photo pour sa portabilité. Un `.tex` brut avec photo n'est pas présenté comme une archive autonome complète.
+
+## G. Résultats exécutés
+
+Exécutions locales sous Windows x64, Node.js 23.8.0, pnpm 10.13.1 et Python 3.13.3. La CI et les instructions Vercel ciblent Node.js 22 ; la CI Linux n'a pas été exécutée depuis ce terminal.
+
+| Commande / contrôle | Résultat observé |
+| --- | --- |
+| `pnpm typecheck` | Réussi |
+| `pnpm lint --max-warnings 0` | Réussi, aucune erreur ni warning |
+| `pnpm test` | 14 tests unitaires + 7 tests PostgreSQL réussis, dont le contrôle de préparation du déploiement |
+| `pnpm test:pdf` avec Tectonic | 37/37 réussis : rendu, aperçus, overflow, images, palette, caractères et multipage |
+| `pnpm exec tsx --test tests/pdf/*.test.ts` avec `LATEX_RENDERER=system` | 37/37 réussis ; la comparaison raster des aperçus est réservée à Tectonic |
+| `pnpm exec tsx --test --test-name-pattern='published thumbnails' tests/pdf/render.test.ts` | Réussi après la régénération finale et la normalisation des fins de ligne Windows/Linux |
+| `python scripts/check-pdf-layout.py` | 16 PDF Tectonic, 1 page chacun, aucun caractère hors page, 5 liens actifs par exemple |
+| `python scripts/check-pdf-layout.py output/pdf/system-templates` | Même contrôle géométrique réussi pour les 16 PDF système |
+| `pnpm pdf:prepare` | 96 compilations de préparation réussies : 16 modèles × 2 familles × 3 densités, avec photo |
+| `pnpm templates:generate` | 16 aperçus issus des PDF réels, texte vérifié et manifest régénéré |
+| `pnpm build` | Build optimisée Next.js 16.4.2 réussie |
+| `pnpm check:bundles` | Deux fonctions vérifiées, environ 147,7 Mio de traces chacune ; workers présents, aucun PDF, dossier QA ou fichier `.env` embarqué |
+| `pnpm test:production` | 1/1 réussi sur `next start` : cookie Secure/HttpOnly/SameSite, PDF natif, source cohérente et révocation |
+| `pnpm test:e2e` | 14/14 réussis : authentification, mobile, style, sauvegardes, versions, droits, photos et partage |
+| `pnpm test:ai:live` | 3 actions OpenRouter réelles, contrats validés et réécritures factuelles filtrées |
+| `pnpm test:e2e:ai:live` | 1/1 réussi avec le fournisseur réel : analyse, condensation, application/sauvegarde/annulation et adaptation Pro |
+| `pnpm audit --prod --json` | 0 vulnérabilité connue dans les dépendances de production |
+| `git -c core.safecrlf=false diff --check` | Réussi |
+| Scan des secrets disponibles dans les 21 chunks client | Aucune valeur OpenRouter/SMTP trouvée ; aucun secret affiché pendant le contrôle |
+| `pnpm db:check:public` | Non concluant, code de sortie 1 ; voir D. Aucun enregistrement privé récupéré |
+| Vérification SMTP via `transporter.verify()` | Connexion et authentification réussies au second essai après un `EDNS` transitoire ; aucun message envoyé |
+
+Le contrôle SMTP vérifie connexion et authentification sans envoyer de message ; il ne prouve pas la délivrabilité ou l'acceptation d'une adresse d'expéditeur. [Documentation Nodemailer](https://nodemailer.com/smtp#verifying-the-configuration).
+
+Les échecs intermédiaires n'ont pas été masqués : syntaxe IA initiale, worker PDF absent, contrôle photo sous le seuil de l'extracteur, téléchargement Tectonic à froid, nettoyage Windows et différences entre moteurs ont été reproduits puis corrigés. Le test de production a également révélé que les variables `NEXT_PUBLIC_*` sont figées à la build : son isolation utilise désormais explicitement l'URL serveur d'exécution. Les tests ne disposent que d'une clé fictive et d'une base locale isolée.
+
+## H. Limites et contrôles externes restants
+
+Avant le push de livraison, ajout d'un contrôle Vercel en lecture seule : colonnes requises et présence des huit RPC via les métadonnées PostgREST. Il bloque la build si les migrations ou l'accès serveur manquent, sans exécuter de SQL ni récupérer de CV. La version actuellement publiée n'est ainsi pas remplacée par cette build incomplète. Ce contrôle ne remplace pas la vérification SQL des permissions ni la recette hébergée.
+
+1. Appliquer/vérifier les migrations dans un Supabase de staging, puis lors du déploiement coordonné. La session locale ne dispose pas d'un accès SQL privilégié au projet hébergé. Les secrets Vercel existants n'ont pas été inspectés ni remplacés.
+2. Vérifier les grants/RLS effectifs et les autres politiques/rôles/RPC exposés dans le projet réel, puis lancer les tests avec deux connexions PostgreSQL réelles. PGlite exécute bien les migrations PostgreSQL mais sérialise les connexions locales ; ses courses ne prouvent pas l'ordonnancement des verrous du service distant.
+3. Exécuter la CI Linux et un Preview Vercel pour valider le binaire musl, la taille finale des fonctions, la copie du cache à froid, la durée configurée et les cookies dans le vrai contexte HTTPS. Les vérifications locales Windows et la build ne remplacent pas ce contrôle hébergé.
+4. Connexion et authentification SMTP ont été validées localement après une erreur DNS transitoire. Vérifier encore l'acceptation de l'expéditeur, la réception et la délivrabilité dans le déploiement réel. Les emails automatisés ont été isolés ; aucun email réel n'a été envoyé.
+5. Les fournisseurs IA peuvent être indisponibles ou limités malgré une configuration valide. Les contrôles réels réalisés constituent des mesures ponctuelles ; ils ne garantissent pas une disponibilité permanente ni des formulations parfaites. Les scripts live permettent de les répéter.
+6. Les alphabets et polices hors du périmètre Latin vérifié nécessitent une configuration dédiée ; les montants importants de contenu exigent réduction ou multipage. Aucun contenu n'est supprimé pour forcer artificiellement une page.
+7. Le conteneur existant a été maintenu mais Docker n'est pas installé dans cette session : aucune build Docker réussie n'est revendiquée. Le navigateur intégré de l'outil n'était pas disponible ; les vérifications navigateur ont utilisé les suites Playwright autorisées et leurs captures.
+
+## I. Nettoyage
+
+Suppression du faux aperçu HTML, des seize illustrations SVG périmées, des générateurs LaTeX inactifs, des helpers/types redondants et des doubles hooks UI. Suppression des wrappers Supabase SSR inutilisés et des dépendances `@supabase/ssr` / `@neondatabase/serverless`. Consolidation du catalogue, du schéma de contenu, des types dérivés, du vocabulaire de mots-clés, des règles de plan et de l'adaptateur IA.
+
+Ajout d'un vrai lint ESLint, de tests isolés, d'une CI, de scripts de vérification des permissions/bundles et de smoke tests IA/production. Mise à jour de `README.md`, `VERCEL.md`, des exemples d'environnement et des guides PDF/migrations. Les commentaires explicitent surtout les invariants de sécurité, concurrence et compilation ; la bibliothèque UI réutilisable existante est conservée.

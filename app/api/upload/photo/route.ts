@@ -1,237 +1,69 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
-import { getSessionUser, updateUser } from '@/lib/db/users'
-import { updateCVPhoto, getCV, getCVWithCurrentVersion, updateCVData } from '@/lib/db/cvs'
-import { supabase } from '@/lib/db'
-import { CVData } from '@/lib/types/cv'
+import { NextResponse } from 'next/server'
 import { nanoid } from 'nanoid'
 import sharp from 'sharp'
+import { requireDatabase } from '@/lib/db'
+import { getCVWithCurrentVersion } from '@/lib/db/cvs'
+import { requireUser, assertSameOrigin, apiError } from '@/lib/server/api'
+import { rateLimit } from '@/lib/server/rate-limit'
+import { AppError, databaseError } from '@/lib/errors'
+import { imageSignature, MAX_PHOTO_BYTES } from '@/lib/photos'
 
-// Configuration
-const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
-const VALID_TYPES = ['image/jpeg', 'image/png', 'image/webp']
-const MAX_DIMENSION = 1024 // Max width/height for resizing
+export const runtime = 'nodejs'
 
-async function processImage(file: File): Promise<{
-  dataUrl: string
-  width?: number
-  height?: number
-  mimeType: string
-  size: number
-}> {
-  const buffer = await file.arrayBuffer()
-  const optimized = await sharp(Buffer.from(buffer), { animated: false })
-    .rotate()
-    .resize({
-      width: MAX_DIMENSION,
-      height: MAX_DIMENSION,
-      fit: 'inside',
-      withoutEnlargement: true,
-    })
-    .webp({ quality: 82 })
-    .toBuffer()
-
-  const metadata = await sharp(optimized).metadata()
-  const dataUrl = `data:image/webp;base64,${optimized.toString('base64')}`
-
-  return {
-    dataUrl,
-    width: metadata.width,
-    height: metadata.height,
-    mimeType: 'image/webp',
-    size: optimized.length,
-  }
-}
-
-async function storeFileRecord(
-  userId: string,
-  fileName: string,
-  originalFile: File,
-  processed: Awaited<ReturnType<typeof processImage>>
-): Promise<{ id: string }> {
-  if (!supabase) {
-    throw new Error('Database not configured')
-  }
-
-  const id = nanoid()
-  const { error } = await supabase.from('uploaded_files').insert({
-    id,
-    user_id: userId,
-    file_type: 'photo',
-    file_name: fileName,
-    file_size: processed.size,
-    mime_type: processed.mimeType,
-    storage_url: processed.dataUrl,
-    storage_provider: 'base64',
-    metadata: {
-      originalName: originalFile.name,
-      originalType: originalFile.type,
-      originalSize: originalFile.size,
-      width: processed.width,
-      height: processed.height,
-      optimized: true,
-    },
-  })
-
-  if (error) {
-    throw new Error(`Failed to store uploaded file metadata: ${error.message}`)
-  }
-
-  return { id }
-}
-
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
-    // Authenticate user
-    const cookieStore = await cookies()
-    const sessionToken = cookieStore.get('session')?.value
-    
-    if (!sessionToken) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    assertSameOrigin(request)
+    const user = await requireUser()
+    await rateLimit(`upload:${user.id}`, 20, 3600)
+    if (Number(request.headers.get('content-length') || 0) > MAX_PHOTO_BYTES + 16384) throw new AppError(413, 'FILE_TOO_LARGE', 'Maximum photo size is 4 MB.')
+    // Bound the multipart stream even when Content-Length is missing or false.
+    const reader = request.body?.getReader()
+    if (!reader) throw new AppError(400, 'INVALID_PHOTO', 'Choose a photo.')
+    const chunks: Uint8Array[] = []
+    let bytes = 0
+    for (;;) {
+      const { value, done } = await reader.read()
+      if (done) break
+      bytes += value.byteLength
+      if (bytes > MAX_PHOTO_BYTES + 16384) { await reader.cancel(); throw new AppError(413, 'FILE_TOO_LARGE', 'Maximum photo size is 4 MB.') }
+      chunks.push(value)
     }
-    
-    const user = await getSessionUser(sessionToken)
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    let form: FormData
+    try {
+      form = await new Request(request.url, { method: 'POST', headers: { 'Content-Type': request.headers.get('content-type') || '' }, body: Buffer.concat(chunks) }).formData()
+    } catch { throw new AppError(400, 'INVALID_FORM', 'Send a valid photo upload form.') }
+    const target = form.get('target')
+    const cvId = form.get('cvId')
+    const revision = Number(form.get('expectedRevision'))
+    if (target !== 'profile' && target !== 'cv') throw new AppError(400, 'INVALID_TARGET', 'Choose a valid photo target.')
+    if (target === 'cv') {
+      if (typeof cvId !== 'string' || !cvId || cvId.length > 100 || !form.has('expectedRevision') || !Number.isSafeInteger(revision) || revision < 0) throw new AppError(400, 'INVALID_TARGET', 'A CV and revision are required.')
+      const cv = await getCVWithCurrentVersion(cvId, user.id)
+      if (!cv) throw new AppError(404, 'CV_NOT_FOUND', 'CV not found')
+      if (cv.revision !== revision) throw new AppError(409, 'REVISION_CONFLICT', 'This CV changed. Save or reload before uploading a photo.')
     }
-    
-    // Parse form data
-    const formData = await request.formData()
-    const file = formData.get('photo') as File | null
-    const target = formData.get('target') as string // 'profile' or 'cv'
-    const cvId = formData.get('cvId') as string | null
-    
-    if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 })
-    }
-    
-    // Validate file type
-    if (!VALID_TYPES.includes(file.type)) {
-      return NextResponse.json({ 
-        error: 'Invalid file type',
-        message: 'Please upload a JPEG, PNG, or WebP image.',
-        allowedTypes: VALID_TYPES
-      }, { status: 400 })
-    }
-    
-    // Validate file size
-    if (file.size > MAX_FILE_SIZE) {
-      return NextResponse.json({ 
-        error: 'File too large',
-        message: `Maximum file size is ${MAX_FILE_SIZE / 1024 / 1024}MB`,
-        maxSize: MAX_FILE_SIZE
-      }, { status: 400 })
-    }
-    
-    // Validate file name (basic sanitization)
-    const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
-    
-    // Process the image
-    const processed = await processImage(file)
-    const { dataUrl } = processed
-    
-    // Store file record
-    const fileRecord = await storeFileRecord(user.id, sanitizedName, file, processed)
-    
-    // Update the appropriate record
-    if (target === 'profile') {
-      await updateUser(user.id, { photo_url: dataUrl })
-    } else if (target === 'cv' && cvId) {
-      const cv = await getCV(cvId)
-      if (!cv || cv.user_id !== user.id) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
-      }
-
-      // Update photo_url column for backward compatibility
-      await updateCVPhoto(cvId, dataUrl)
-      
-      // ALSO update the CV data to include photoUrl in basics
-      // This ensures the photo persists when loading CV data
-      try {
-        const cv = await getCVWithCurrentVersion(cvId)
-        if (cv && cv.current_version?.data) {
-          const updatedData: CVData = {
-            ...cv.current_version.data,
-            basics: {
-              ...cv.current_version.data.basics,
-              photoUrl: dataUrl,
-            },
-          }
-          await updateCVData(cvId, updatedData)
-        }
-      } catch (dbError) {
-        console.error('[Upload] Error updating CV data with photo:', dbError)
-        // Photo is still saved in photo_url column, so continue
-      }
-    }
-    
-    return NextResponse.json({ 
-      success: true,
-      fileId: fileRecord.id,
-      url: dataUrl,
-      fileName: sanitizedName,
-      fileSize: processed.size,
-      mimeType: processed.mimeType,
-      width: processed.width,
-      height: processed.height,
-      message: 'Photo uploaded successfully'
+    const file = form.get('photo')
+    if (!(file instanceof File) || file.size === 0) throw new AppError(400, 'INVALID_PHOTO', 'Choose a JPEG, PNG, or WebP photo under 4 MB.')
+    if (file.size > MAX_PHOTO_BYTES) throw new AppError(413, 'FILE_TOO_LARGE', 'Maximum photo size is 4 MB.')
+    const buffer = Buffer.from(await file.arrayBuffer())
+    const format = imageSignature(buffer)
+    if (!format || file.type !== `image/${format}`) throw new AppError(400, 'INVALID_PHOTO', 'The photo signature must match its JPEG, PNG, or WebP type.')
+    let optimized: Buffer
+    try {
+      const image = sharp(buffer, { animated: false, limitInputPixels: 16000000, failOn: 'warning' })
+      const meta = await image.metadata()
+      if ((meta.pages || 1) > 1 || !meta.width || !meta.height || meta.width > 8000 || meta.height > 8000) throw new Error('Dimensions')
+      optimized = await image.rotate().resize({ width: 512, height: 512, fit: 'inside', withoutEnlargement: true }).webp({ quality: 82 }).toBuffer()
+    } catch { throw new AppError(400, 'INVALID_PHOTO', 'The image is malformed, animated, or exceeds 16 megapixels.') }
+    const fileId = nanoid()
+    const { data, error } = await requireDatabase().rpc('save_photo', {
+      p_user_id: user.id, p_target: target, p_cv_id: target === 'cv' ? cvId : null,
+      p_expected_revision: target === 'cv' ? revision : null, p_file_id: fileId,
+      p_data_url: `data:image/webp;base64,${optimized.toString('base64')}`,
+      p_name: file.name.replace(/[^a-zA-Z0-9.-]/g, '_').slice(0, 200), p_size: optimized.length,
     })
-  } catch (error) {
-    console.error('[Upload] Error uploading photo:', error)
-    return NextResponse.json({ 
-      error: 'Failed to upload photo',
-      message: 'An unexpected error occurred. Please try again.'
-    }, { status: 500 })
-  }
-}
-
-// DELETE endpoint to remove photos
-export async function DELETE(request: NextRequest) {
-  try {
-    const cookieStore = await cookies()
-    const sessionToken = cookieStore.get('session')?.value
-    
-    if (!sessionToken) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    
-    const user = await getSessionUser(sessionToken)
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    
-    const { target, cvId } = await request.json()
-    
-    if (target === 'profile') {
-      await updateUser(user.id, { photo_url: null })
-    } else if (target === 'cv' && cvId) {
-      const cv = await getCV(cvId)
-      if (!cv || cv.user_id !== user.id) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
-      }
-
-      await updateCVPhoto(cvId, null)
-
-      const cvWithVersion = await getCVWithCurrentVersion(cvId)
-      if (cvWithVersion?.current_version?.data) {
-        const currentData = cvWithVersion.current_version.data
-        const updatedData: CVData = {
-          ...currentData,
-          basics: {
-            ...currentData.basics,
-            photoUrl: undefined,
-          },
-        }
-        await updateCVData(cvId, updatedData)
-      }
-    }
-    
-    return NextResponse.json({ 
-      success: true,
-      message: 'Photo removed successfully'
-    })
-  } catch (error) {
-    console.error('[Upload] Error removing photo:', error)
-    return NextResponse.json({ error: 'Failed to remove photo' }, { status: 500 })
-  }
+    if (error) databaseError(error)
+    if (!data) throw new AppError(503, 'PERSISTENCE_FAILED', 'Photo persistence was not confirmed.')
+    return NextResponse.json({ success: true, ...data })
+  } catch (error) { return apiError(error) }
 }

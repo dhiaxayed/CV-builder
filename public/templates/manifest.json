@@ -1,0 +1,134 @@
+{
+  "sourceHash": "06102348a5ba00ec1313c5d9216b05f1eda75d7822eb53711a5142951e03575e",
+  "renderer": "tectonic",
+  "templates": [
+    {
+      "template": "modern",
+      "pages": 1,
+      "density": "compact",
+      "extractableText": true,
+      "preview": "actual PDF first page",
+      "renderHash": "cb3c771b9ca71d6113468206e62d56854e81762839eb5d688404c6ee30264cbb"
+    },
+    {
+      "template": "classic",
+      "pages": 1,
+      "density": "compact",
+      "extractableText": true,
+      "preview": "actual PDF first page",
+      "renderHash": "349b53606b71f2123d27364ec4a2240d0033efd98f56be92defd8ee0e9415d22"
+    },
+    {
+      "template": "minimal",
+      "pages": 1,
+      "density": "dense",
+      "extractableText": true,
+      "preview": "actual PDF first page",
+      "renderHash": "1beb5349a348062135314996e68477fa52d3683c224d784822aff1e5db4f47c4"
+    },
+    {
+      "template": "compact",
+      "pages": 1,
+      "density": "normal",
+      "extractableText": true,
+      "preview": "actual PDF first page",
+      "renderHash": "4fed79fa1ddfce9136bb52b6f3f6b8aea2fd7a4a44936453a023c3bc631cf75a"
+    },
+    {
+      "template": "professional",
+      "pages": 1,
+      "density": "dense",
+      "extractableText": true,
+      "preview": "actual PDF first page",
+      "renderHash": "944e512cc655cfbb0595ba3ebafb3f9e3ff1d384bccefc4ca8ff681f0cdd391c"
+    },
+    {
+      "template": "executive",
+      "pages": 1,
+      "density": "dense",
+      "extractableText": true,
+      "preview": "actual PDF first page",
+      "renderHash": "8afc115f24c6cadf95420377bf356c485f18bda0934ec5678762e50df905ec2f"
+    },
+    {
+      "template": "banking",
+      "pages": 1,
+      "density": "compact",
+      "extractableText": true,
+      "preview": "actual PDF first page",
+      "renderHash": "aeb6aba950871feeeaddee57f591a617c924e8ca9343f324e2924590e1c59b2a"
+    },
+    {
+      "template": "elegant",
+      "pages": 1,
+      "density": "normal",
+      "extractableText": true,
+      "preview": "actual PDF first page",
+      "renderHash": "76acb1c9800827ad106e7da2f0acc849a213842bcfa9f78c0411c0576920be1a"
+    },
+    {
+      "template": "creative",
+      "pages": 1,
+      "density": "compact",
+      "extractableText": true,
+      "preview": "actual PDF first page",
+      "renderHash": "221efd4332d9c3fa363cbfb1dd03a77ed4b556bc3fc6dbc5c907d5a86e71fad7"
+    },
+    {
+      "template": "fancy",
+      "pages": 1,
+      "density": "compact",
+      "extractableText": true,
+      "preview": "actual PDF first page",
+      "renderHash": "2c7ee0d797eb1feecdea27f0d882a06215e057a31bf687be69d9a3627a9de390"
+    },
+    {
+      "template": "bold",
+      "pages": 1,
+      "density": "compact",
+      "extractableText": true,
+      "preview": "actual PDF first page",
+      "renderHash": "95d79d605b361ecc8383a9acdb93bde23132c5fde9c939c702fb1099471d2bc8"
+    },
+    {
+      "template": "infographic",
+      "pages": 1,
+      "density": "normal",
+      "extractableText": true,
+      "preview": "actual PDF first page",
+      "renderHash": "b41a0189d9d3e2884bf0fcdd03784f0d8850ad6acba0e8d05512e32fd85cde70"
+    },
+    {
+      "template": "tech",
+      "pages": 1,
+      "density": "normal",
+      "extractableText": true,
+      "preview": "actual PDF first page",
+      "renderHash": "5f3a8373aa9f9c04771f8ebe16fe5cc422477a24d7f4c91f62de42bfcb5f5902"
+    },
+    {
+      "template": "academic",
+      "pages": 1,
+      "density": "dense",
+      "extractableText": true,
+      "preview": "actual PDF first page",
+      "renderHash": "fc082bd4d3bb0116f8a8d49c533cdc5a3548b4c502d24ab0298adaedc89b9748"
+    },
+    {
+      "template": "casual",
+      "pages": 1,
+      "density": "dense",
+      "extractableText": true,
+      "preview": "actual PDF first page",
+      "renderHash": "f4040b890e7ef67c55b567b9886793ab52d456ad9a2386294907761097d87d98"
+    },
+    {
+      "template": "vintage",
+      "pages": 1,
+      "density": "dense",
+      "extractableText": true,
+      "preview": "actual PDF first page",
+      "renderHash": "61e594eb2b8639e7ee14661550dd2ee73c6dbeca219cbf1a5537c1269894ce23"
+    }
+  ]
+}
