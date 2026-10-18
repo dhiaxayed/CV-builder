@@ -9,7 +9,8 @@ import { TEMPLATES } from '@/lib/templates'
 import { SectionAwards } from '@/components/cv-editor/section-awards'
 import { SectionCustom } from '@/components/cv-editor/section-custom'
 import { AppearanceSettings } from '@/components/cv-editor/appearance-settings'
-import { generateLatex, type RenderDensity } from '@/lib/latex/generator'
+import { generateLatex } from '@/lib/latex/generator'
+import { usePDFPreview } from '@/hooks/use-pdf-preview'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -87,33 +88,47 @@ export default function CVEditorPage() {
   const [mobilePane, setMobilePane] = useState<'edit' | 'tools'>('edit')
   const [activeView, setActiveView] = useState<'form' | 'latex'>('form')
   const [rightPanel, setRightPanel] = useState<'preview' | 'ats' | 'jd' | 'ai'>('preview')
-  const [compiledLayout, setCompiledLayout] = useState<{ data:CVData; template:string; density:RenderDensity } | null>(null)
-  const latexCode = useMemo(() => cvData && cv ? generateLatex(cvData,cv.template_id,compiledLayout?.data === cvData && compiledLayout.template === cv.template_id ? compiledLayout.density : 'normal') : '',[cvData,cv,compiledLayout])
   const [saveVersionDialogOpen, setSaveVersionDialogOpen] = useState(false)
   const [versionNote, setVersionNote] = useState('')
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
   const [lastVersionSavedLabel, setLastVersionSavedLabel] = useState<string | null>(null)
-  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null)
-  const [isPdfPreviewLoading, setIsPdfPreviewLoading] = useState(false)
-  const [pdfPreviewError, setPdfPreviewError] = useState<string | null>(null)
   const [pageMode, setPageMode] = useState<'one-page' | 'multi-page'>('one-page')
-  const [pdfErrorCode, setPdfErrorCode] = useState<string | null>(null)
   const [previewAttempt, setPreviewAttempt] = useState(0)
-  const [pdfPages, setPdfPages] = useState<number | null>(null)
   const [isExporting, setIsExporting] = useState(false)
+  const exportBusyRef = useRef(false)
   const saverRef = useRef<RevisionSaver<{ data: CVData; templateId: string; title: string }> | null>(null)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved')
   const [saveError, setSaveError] = useState<string | null>(null)
   const dataRef = useRef<CVData | null>(null)
-  dataRef.current = cvData
   const undoRef = useRef<Array<{ before: CVData; after: CVData }>>([])
   const [canUndoAI, setCanUndoAI] = useState(false)
-  const pdfPreviewUrlRef = useRef<string | null>(null)
+  const preview=usePDFPreview(cvData,cv?.template_id,pageMode,rightPanel==='preview',previewAttempt)
+  const pdfPreviewUrl=preview.compiled?.url
+  const pdfPages=preview.compiled?.pages
+  const isPdfPreviewLoading=preview.loading
+  const pdfPreviewError=preview.error?.message
+  const pdfErrorCode=preview.error?.code
+  const latexCode=useMemo(() => cvData && cv ? generateLatex(cvData,cv.template_id,!preview.stale && preview.compiled ? preview.compiled.density : 'normal') : '',[cvData,cv,preview.compiled,preview.stale])
 
-  const loadCV = useCallback(async () => {
+  // Update the canonical draft during the event, before a save/export can run.
+  // React state mirrors this value; effects only schedule persistence.
+  const updateDraft = (updates:Partial<{ data:CVData; templateId:string; title:string }>) => {
+    const saver=saverRef.current
+    if (!saver) return
+    const next={ ...saver.value,...updates }
+    saver.change(next)
+    dataRef.current=next.data
+    setCvData(next.data)
+    if (updates.templateId!==undefined || updates.title!==undefined) {
+      setCv(current => current ? { ...current,template_id:next.templateId,title:next.title } : current)
+    }
+  }
+
+  const loadCV = useCallback(async (signal:AbortSignal) => {
     try {
       setIsLoading(true)
-      const response = await fetch(`/api/cvs/${params.id}`, { cache: 'no-store' })
+      const response = await fetch(`/api/cvs/${params.id}`, { cache: 'no-store',signal })
+      if (signal.aborted) return
 
       if (!response.ok) {
         if (response.status === 404 || response.status === 403) {
@@ -124,8 +139,9 @@ export default function CVEditorPage() {
       }
 
       const { cv: loadedCV } = await response.json()
+      if (signal.aborted) return
       const initial = loadedCV.data || DEFAULT_CV_DATA
-      saverRef.current = new RevisionSaver({ data: initial, templateId: loadedCV.template_id, title: loadedCV.title }, loadedCV.revision,
+      const saver = new RevisionSaver({ data: initial, templateId: loadedCV.template_id, title: loadedCV.title }, loadedCV.revision,
         async (snapshot, expectedRevision) => {
           const response = await fetch(`/api/cvs/${loadedCV.id}`, {
             method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -134,116 +150,48 @@ export default function CVEditorPage() {
           })
           const result = await response.json()
           if (!response.ok) throw Object.assign(new Error(result.error || 'Save failed. Please retry.'), { status: response.status })
-          setLastSavedAt(new Date().toISOString())
+          if (saverRef.current===saver && !signal.aborted) setLastSavedAt(new Date().toISOString())
           return result.revision
         }, status => {
+          if (saverRef.current!==saver || signal.aborted) return
           setSaveStatus(status)
           setIsSaving(status === 'saving')
           setHasUnsavedChanges(Boolean(saverRef.current?.dirty))
           setSaveError(saverRef.current?.error || null)
         })
+      saverRef.current=saver
+      dataRef.current=initial
+      undoRef.current=[]; setCanUndoAI(false)
+      setSaveStatus('saved'); setIsSaving(false); setHasUnsavedChanges(false); setSaveError(null)
       setCv(loadedCV)
       setCvData(initial)
       setLastSavedAt(loadedCV.updated_at || new Date().toISOString())
     } catch (error) {
+      if (signal.aborted) return
       console.error('Error loading CV:', error)
       toast({ title: 'Failed to load CV', variant: 'destructive' })
       router.push('/dashboard')
     } finally {
-      setIsLoading(false)
+      if (!signal.aborted) setIsLoading(false)
     }
   }, [params.id, router, toast])
 
   // Load CV data from database
   useEffect(() => {
-    if (!authLoading && !user) {
+    if (!authLoading && !user?.id) {
       router.push('/auth/signin')
       return
     }
 
-    if (user && params.id) {
-      loadCV()
-    }
-  }, [authLoading, user, params.id, loadCV, router])
-
-  useEffect(() => {
-    return () => {
-      if (pdfPreviewUrlRef.current) {
-        URL.revokeObjectURL(pdfPreviewUrlRef.current)
-      }
-    }
-  }, [])
-
-  useEffect(() => {
-    if (rightPanel !== 'preview' || !cvData || !cv) return
-
-    const controller = new AbortController()
-    setPdfPreviewUrl(null)
-    setPdfPreviewError(null)
-    setPdfErrorCode(null)
-    setIsPdfPreviewLoading(true)
-    const timeout = window.setTimeout(async () => {
-      setIsPdfPreviewLoading(true)
-      setPdfPreviewError(null)
-
-      try {
-        const response = await fetch('/api/pdf', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          cache: 'no-store',
-          signal: controller.signal,
-          body: JSON.stringify({
-            cvData,
-            templateId: cv.template_id,
-            title: cv.title,
-            format: 'pdf',
-            intent: 'preview',
-            pageMode,
-          }),
-        })
-
-        if (!response.ok) {
-          const error = await response.json().catch(() => ({}))
-          setPdfErrorCode(error.code || null)
-          throw new Error(error.message || error.error || 'The PDF service could not complete this request. Retry in a moment.')
-        }
-
-        const blob = await response.blob()
-        if (controller.signal.aborted) return
-        const nextUrl = URL.createObjectURL(blob)
-
-        if (pdfPreviewUrlRef.current) {
-          URL.revokeObjectURL(pdfPreviewUrlRef.current)
-        }
-
-        pdfPreviewUrlRef.current = nextUrl
-        setPdfPreviewUrl(nextUrl)
-        setPdfPages(Number(response.headers.get('X-CV-PDF-Pages')) || null)
-        const density = response.headers.get('X-CV-PDF-Density')
-        if (density === 'normal' || density === 'compact' || density === 'dense') setCompiledLayout({ data:cvData,template:cv.template_id,density })
-      } catch (error) {
-        if (controller.signal.aborted) return
-        setPdfPreviewError(error instanceof Error ? error.message : 'Failed to compile LaTeX PDF preview')
-      } finally {
-        if (!controller.signal.aborted) {
-          setIsPdfPreviewLoading(false)
-        }
-      }
-    }, 1200)
-
-    return () => {
-      window.clearTimeout(timeout)
-      controller.abort()
-    }
-  }, [rightPanel, cvData, cv, pageMode, previewAttempt])
+    const controller=new AbortController()
+    if (!authLoading && user?.id && params.id) void loadCV(controller.signal)
+    return () => { controller.abort(); void saverRef.current?.flush().catch(() => {}) }
+  }, [authLoading, user?.id, params.id, loadCV, router])
 
   // All content and template changes enter one queue, including photo and AI edits.
   useEffect(() => {
     const saver = saverRef.current
     if (!saver || !cvData || !cv) return
-    if (saver.value.data !== cvData || saver.value.templateId !== cv.template_id || saver.value.title !== cv.title) {
-      saver.change({ data: cvData, templateId: cv.template_id, title: cv.title })
-    }
     if (!saver.dirty || saver.status === 'conflict') return
     const timer = window.setTimeout(() => { void saver.flush().catch(() => {}) }, 1200)
     return () => window.clearTimeout(timer)
@@ -277,8 +225,7 @@ export default function CVEditorPage() {
     undoRef.current.push({ before, after })
     if (undoRef.current.length > 10) undoRef.current.shift()
     setCanUndoAI(true)
-    dataRef.current = after
-    setCvData(after)
+    updateDraft({ data:after })
   }
 
   const undoAI = () => {
@@ -292,17 +239,15 @@ export default function CVEditorPage() {
         Object.assign(next, { [field]: change.before[field] })
       }
     }
-    setCvData(next)
+    updateDraft({ data:next })
     setCanUndoAI(undoRef.current.length > 0)
     toast({ title: 'AI changes undone; later manual edits preserved' })
   }
 
   // Handle data changes
   const handleDataChange = (updates: Partial<CVData>) => {
-    setCvData((current) => {
-      if (!current) return current
-      return { ...current, ...updates }
-    })
+    const current=saverRef.current?.value.data
+    if (current) updateDraft({ data:{ ...current,...updates } })
   }
 
   const applyAISummary = (summary: string) => {
@@ -471,7 +416,7 @@ export default function CVEditorPage() {
 
   // Handle template change
   const handleTemplateChange = (templateId: string) => {
-    setCv(current => current ? { ...current, template_id: templateId } : current)
+    updateDraft({ templateId })
   }
 
   const handlePhotoUpload = async (file: File) => {
@@ -493,76 +438,37 @@ export default function CVEditorPage() {
     })
   }
 
-  // Download LaTeX
-  const handleDownloadLatex = () => {
-    const blob = new Blob([latexCode], { type: 'text/plain' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${cv?.title.replace(/\s+/g, '_')}_${cvData?.basics.name.replace(/\s+/g, '_') || 'cv'}.tex`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-    toast({ title: 'LaTeX file downloaded' })
-  }
-
-  // Export to PDF (template-accurate LaTeX compilation)
-  const handleExportPDF = async () => {
-    if (isExporting) return
-    setIsExporting(true)
+  // Freeze persistence while the server reads this revision. Typing remains
+  // available; later edits queue behind the export instead of racing it.
+  const downloadCV = async (format:'pdf'|'latex') => {
+    const saver=saverRef.current
+    if (!saver || !cv || exportBusyRef.current) return
+    exportBusyRef.current=true; setIsExporting(true)
     try {
-      if (!cvData) {
-        throw new Error('CV data is not loaded yet')
-      }
-
-      const saved = await saveChanges()
-      if (!saved) {
-        throw new Error('Save your latest changes before exporting the PDF')
-      }
-
-      const snapshot = saverRef.current?.value
-      toast({ title: 'Generating PDF...' })
-
-      const response = await fetch('/api/pdf', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        cache: 'no-store',
-        body: JSON.stringify({
-          cvId: cv?.id,
-          expectedRevision: saverRef.current?.serverRevision,
-          templateId: snapshot?.templateId || cv?.template_id,
-          title: cv?.title,
-          format: 'pdf',
-          pageMode,
-        }),
+      await saver.exclusive(async (snapshot,expectedRevision) => {
+        const bundled=format==='latex' && Boolean(snapshot.data.basics.photoUrl)
+        const response=await fetch('/api/pdf',{
+          method:'POST',headers:{ 'Content-Type':'application/json' },cache:'no-store',
+          body:JSON.stringify({ cvId:cv.id,expectedRevision,format:bundled ? 'latex-bundle' : format,pageMode }),
+        })
+        if (!response.ok) {
+          const problem=await response.json().catch(() => ({}))
+          // Another tab may advance the revision. Keep local edits dirty and
+          // require a reload rather than silently exporting a different draft.
+          throw Object.assign(new Error(problem.message || problem.error || 'Unable to download this file. Please retry.'),{ status:response.status })
+        }
+        const blob=await response.blob()
+        const url=URL.createObjectURL(blob)
+        const a=document.createElement('a')
+        a.href=url
+        a.download=`${snapshot.title.replace(/[^a-zA-Z0-9_-]+/g,'_') || 'cv'}.${bundled ? 'zip' : format==='latex' ? 'tex' : 'pdf'}`
+        document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url)
+        return { result:undefined }
       })
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({}))
-        throw new Error(error.message || error.error || 'The PDF service could not complete this request. Retry in a moment.')
-      }
-
-      const blob = await response.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      const baseName = `${cvData.basics.name.replace(/\s+/g, '_') || 'cv'}_${cv?.title?.replace(/\s+/g, '_') || 'resume'}`
-      a.href = url
-      a.download = `${baseName}.pdf`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-
-      toast({ title: 'PDF downloaded from LaTeX' })
+      toast({ title:format==='pdf' ? 'PDF downloaded from LaTeX' : 'LaTeX source downloaded' })
     } catch (error) {
-      toast({
-        title: error instanceof Error ? error.message : 'Failed to generate PDF',
-        variant: 'destructive'
-      })
-    } finally {
-      setIsExporting(false)
-    }
+      toast({ title:error instanceof Error ? error.message : 'Download failed',variant:'destructive' })
+    } finally { exportBusyRef.current=false; setIsExporting(false) }
   }
 
   if (authLoading || isLoading) {
@@ -600,7 +506,7 @@ export default function CVEditorPage() {
             <div className="flex flex-col">
               <div className="flex items-center gap-2">
                 <FileText className="h-5 w-5 text-primary" />
-                <Input aria-label="CV title" className="h-8 max-w-56 font-semibold" maxLength={255} value={cv.title} onChange={event => setCv(current => current ? { ...current, title: event.target.value } : current)} />
+                <Input aria-label="CV title" className="h-8 max-w-56 font-semibold" maxLength={255} value={cv.title} onChange={event => updateDraft({ title:event.target.value })} onBlur={() => { if (!saverRef.current?.value.title.trim()) updateDraft({ title:'Untitled CV' }) }} />
               </div>
               <p className="hidden xl:block text-xs text-muted-foreground">
                 Use Preview to inspect layout, then open AI Assist for review, tailoring, and factual rewrites.
@@ -650,12 +556,12 @@ export default function CVEditorPage() {
               Version
             </Button>
 
-            <Button variant="outline" size="sm" onClick={handleDownloadLatex}>
+            <Button variant="outline" size="sm" onClick={() => downloadCV('latex')} disabled={isExporting}>
               <Download className="h-4 w-4 mr-1" />
-              .tex
+              {cvData.basics.photoUrl ? '.tex + photo' : '.tex'}
             </Button>
 
-            <Button size="sm" onClick={handleExportPDF} disabled={isExporting}>
+            <Button size="sm" onClick={() => downloadCV('pdf')} disabled={isExporting}>
               {isExporting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />}
               {isExporting ? 'Exporting...' : 'PDF'}
             </Button>
@@ -669,7 +575,7 @@ export default function CVEditorPage() {
             {saveStatusLabel}
           </span>
           {saveError && <span role="alert" className="text-destructive">{saveError} <Button size="sm" variant="outline" onClick={() => {
-            const blob = new Blob([JSON.stringify({ data: cvData, templateId: cv.template_id }, null, 2)], { type: 'application/json' })
+            const blob = new Blob([JSON.stringify({ data: cvData, templateId: cv.template_id, title:cv.title }, null, 2)], { type: 'application/json' })
             const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'unsaved-cv.json'; a.click(); URL.revokeObjectURL(url)
           }}>Download local copy</Button></span>}
           {canUndoAI && <Button variant="outline" size="sm" onClick={undoAI}>Undo AI change</Button>}
@@ -758,7 +664,7 @@ export default function CVEditorPage() {
                   {latexCode}
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
-                  This source uses the latest compiled preview layout for these edits, or the base layout while a new preview is pending.
+                  Read-only generated source. Downloads use the validated layout for your latest saved edits. With a photo, the download includes both files in a ZIP.
                 </p>
               </div>
             )}
@@ -813,28 +719,32 @@ export default function CVEditorPage() {
                   )}
                 </div>
 
+                {preview.stale && pdfPreviewUrl && (
+                  <p role="status" className="shrink-0 border-b bg-amber-50 px-3 py-2 text-xs text-amber-900">Previous preview. {isPdfPreviewLoading ? 'Updating your latest edits; you can keep typing.' : 'Latest edits are not shown yet.'}</p>
+                )}
                 {pdfPreviewError ? (
-                  <div role="alert" className="m-4 overflow-y-auto rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+                  <div role="alert" className="m-3 max-h-[40%] shrink-0 overflow-y-auto rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
                     <p className="font-medium">{pdfErrorCode === 'PDF_OVERFLOW' ? 'Your CV needs more space' : 'PDF preview unavailable'}</p>
                     <p className="mt-2 whitespace-pre-wrap text-xs">{pdfPreviewError}</p>
                     <Button variant="outline" size="sm" className="mt-3" onClick={() => pdfErrorCode === 'PDF_OVERFLOW' ? setPageMode('multi-page') : setPreviewAttempt(value => value + 1)}>
                       {pdfErrorCode === 'PDF_OVERFLOW' ? 'Allow multiple pages' : 'Retry preview'}
                     </Button>
                   </div>
-                ) : pdfPreviewUrl ? (
+                ) : null}
+                {pdfPreviewUrl ? (
                   <iframe
                     src={pdfPreviewUrl}
                     title="Compiled LaTeX PDF preview"
                     className="h-full w-full flex-1 bg-white"
                   />
-                ) : (
+                ) : !pdfPreviewError ? (
                   <div className="flex h-full flex-1 items-center justify-center text-sm text-muted-foreground">
                     <div className="flex items-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Compiling LaTeX preview...
                     </div>
                   </div>
-                )}
+                ) : null}
               </div>
             )}
             {rightPanel === 'ats' && (

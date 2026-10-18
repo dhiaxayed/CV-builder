@@ -8,8 +8,9 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { FolderOpen, Plus, Trash2, ChevronDown, GripVertical } from 'lucide-react'
+import { FolderOpen, Plus, Trash2, ChevronDown } from 'lucide-react'
 import { useState } from 'react'
+import { EntryOrderControls, moveEntry } from './entry-order-controls'
 
 interface SectionProjectsProps {
   data: ProjectItem[]
@@ -82,7 +83,7 @@ export function SectionProjects({ data = [], onChange }: SectionProjectsProps) {
             <FolderOpen className="h-5 w-5" />
             Projects
           </CardTitle>
-          <Button variant="outline" size="sm" onClick={addItem}>
+          <Button variant="outline" size="sm" disabled={safeData.length>=50} onClick={addItem}>
             <Plus className="h-4 w-4 mr-1" />
             Add
           </Button>
@@ -96,16 +97,18 @@ export function SectionProjects({ data = [], onChange }: SectionProjectsProps) {
             <Button variant="link" onClick={addItem}>Add a project</Button>
           </div>
         ) : (
-          safeData.map((item) => (
+          safeData.map((item,index) => (
             <Collapsible 
               key={item.id} 
               open={openItems.has(item.id)}
               onOpenChange={() => toggleItem(item.id)}
             >
               <div className="border rounded-lg">
-                <CollapsibleTrigger asChild>
-                  <div className="flex items-center gap-2 p-3 cursor-pointer hover:bg-muted/50">
-                    <GripVertical className="h-4 w-4 text-muted-foreground" />
+                <div className="flex items-center gap-1">
+                  <EntryOrderControls index={index} count={safeData.length} label={`project ${index+1}`}
+                    onMove={direction => onChange(moveEntry(safeData,index,direction))} />
+                  <CollapsibleTrigger asChild>
+                    <button type="button" aria-label={`Toggle project ${index+1}: ${item.name || 'Untitled'}`} className="flex min-w-0 flex-1 items-center gap-2 rounded p-3 text-left hover:bg-muted/50 focus-visible:outline-2 focus-visible:outline-ring">
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate">
                         {item.name || 'Untitled Project'}
@@ -115,8 +118,9 @@ export function SectionProjects({ data = [], onChange }: SectionProjectsProps) {
                       </p>
                     </div>
                     <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200" />
-                  </div>
-                </CollapsibleTrigger>
+                    </button>
+                  </CollapsibleTrigger>
+                </div>
                 
                 <CollapsibleContent>
                   <div className="p-4 pt-0 space-y-4 border-t">

@@ -15,6 +15,7 @@ export const cvDataSchema = z.object({
   appearance: z.object({
     colorTheme:z.enum(COLOR_THEME_IDS).default('template'),
     font:z.enum(['template','sans','serif']).default('template'),
+    photoPosition:z.enum(['template','left','right']).optional(),
   }).strict().optional(),
   basics: z.object({
     name: short.default(''), title: short.default(''), photoUrl: photo.optional(),

@@ -23,7 +23,7 @@ Galerie → connexion par email → tableau de bord → création → éditeur �
 | `lib/validation/cv.ts`, `lib/types/cv.ts` | Contrat de contenu validé à l'exécution et types TypeScript dérivés |
 | `lib/db`, `scripts/003-*.sql`, `scripts/004-*.sql` | Accès serveur, propriétaires, transactions, brouillons et historique immuable |
 | `lib/autosave.ts` | File de sauvegarde sérialisée et contrôle des révisions |
-| `lib/templates.ts`, `lib/latex/generator.ts` | Catalogue, palettes et génération LaTeX des seize modèles |
+| `lib/templates.ts`, `lib/latex/generator.ts` | Catalogue, palettes et génération LaTeX des vingt-quatre modèles |
 | `lib/pdf` | Compilation native, comptage des pages, débordement et cache borné |
 | `lib/ai` | Fournisseur configurable, contrats JSON, recommandations factuelles et secours local explicite |
 | `lib/server`, `proxy.ts` | Sessions, origines, validation des requêtes et quotas distribués |

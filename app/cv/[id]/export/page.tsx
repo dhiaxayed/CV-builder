@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { CVData } from '@/lib/types/cv'
@@ -33,6 +33,8 @@ export default function ExportPage() {
   const [shareUrl, setShareUrl] = useState('')
   const [multiPage, setMultiPage] = useState(false)
   const [sharingBusy, setSharingBusy] = useState(false)
+  const [downloadBusy,setDownloadBusy]=useState(false)
+  const downloadBusyRef=useRef(false)
   
   useEffect(() => {
     if (!authLoading && !user) {
@@ -74,8 +76,9 @@ export default function ExportPage() {
   }, [authLoading, user, params.id, router, toast])
   
   const downloadFile = async (format: 'pdf' | 'latex' | 'json') => {
-    if (!cv?.data) return
-    
+    if (!cv?.data || downloadBusyRef.current) return
+    downloadBusyRef.current=true; setDownloadBusy(true)
+    const bundled=format==='latex' && Boolean(cv.data.basics.photoUrl)
     try {
       const response = await fetch('/api/pdf', {
         method: 'POST',
@@ -87,13 +90,13 @@ export default function ExportPage() {
           pageMode: multiPage ? 'multi-page' : 'one-page',
           templateId: cv.template_id,
           title: cv.title,
-          format,
+          format:bundled ? 'latex-bundle' : format,
         }),
       })
       
       if (!response.ok) {
         const error = await response.json().catch(() => ({}))
-        throw new Error(error.message || 'Failed to generate file')
+        throw new Error(error.message || error.error || 'Failed to generate file')
       }
 
       const blob = await response.blob()
@@ -101,7 +104,7 @@ export default function ExportPage() {
       const a = document.createElement('a')
       a.href = url
       const baseName = `resume_${cv.data.basics.name.replace(/\s+/g, '_') || 'cv'}_${cv.title.replace(/\s+/g, '_')}`
-      const extension = format === 'latex' ? 'tex' : format
+      const extension = bundled ? 'zip' : format === 'latex' ? 'tex' : format
       a.download = `${baseName}.${extension}`
       document.body.appendChild(a)
       a.click()
@@ -115,7 +118,7 @@ export default function ExportPage() {
         title: error instanceof Error ? error.message : 'Failed to download file', 
         variant: 'destructive' 
       })
-    }
+    } finally { downloadBusyRef.current=false; setDownloadBusy(false) }
   }
   
   const toggleSharing = async (enabled: boolean) => {
@@ -217,7 +220,7 @@ export default function ExportPage() {
                 Download Files
               </CardTitle>
               <CardDescription>
-                Export your CV in different formats for different use cases
+                {downloadBusy ? 'Preparing your download. Please wait...' : 'Export your CV in different formats for different use cases'}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -235,7 +238,7 @@ export default function ExportPage() {
                       </p>
                     </div>
                   </div>
-                  <Button variant="outline" onClick={() => downloadFile('pdf')}>
+                  <Button variant="outline" disabled={downloadBusy} onClick={() => downloadFile('pdf')}>
                     <Download className="h-4 w-4 mr-2" />
                     Download
                   </Button>
@@ -249,13 +252,13 @@ export default function ExportPage() {
                       <Code className="h-5 w-5" />
                     </div>
                     <div>
-                      <h4 className="font-medium">LaTeX Source (.tex)</h4>
+                      <h4 className="font-medium">LaTeX Source {cv.data.basics.photoUrl ? '(.zip, photo included)' : '(.tex)'}</h4>
                       <p className="text-sm text-muted-foreground mt-1">
-                        Download the LaTeX source to customize the layout or keep a version-controlled backup.
+                        Download the validated LaTeX source. With a photo, a ZIP includes cv.tex and the round cv_photo.png so the source can compile elsewhere.
                       </p>
                     </div>
                   </div>
-                  <Button variant="outline" onClick={() => downloadFile('latex')}>
+                  <Button variant="outline" disabled={downloadBusy} onClick={() => downloadFile('latex')}>
                     <Download className="h-4 w-4 mr-2" />
                     Download
                   </Button>
@@ -275,7 +278,7 @@ export default function ExportPage() {
                       </p>
                     </div>
                   </div>
-                  <Button variant="outline" onClick={() => downloadFile('json')}>
+                  <Button variant="outline" disabled={downloadBusy} onClick={() => downloadFile('json')}>
                     <Download className="h-4 w-4 mr-2" />
                     Download
                   </Button>

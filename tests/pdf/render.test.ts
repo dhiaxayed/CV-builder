@@ -59,6 +59,31 @@ test('special TeX characters and a photo survive actual compilation', { timeout:
     assert.ok((await parser.getImage({ imageThreshold:0 })).pages.some(page=>page.images.length>0),'Photo must be embedded')
   } finally { await parser.destroy() }
 })
+
+for (const id of TEMPLATE_IDS) {
+  test(`${id}: round photo supports both positions without losing content`,{ timeout:180000 },async () => {
+    const image=await sharp({ create:{ width:180,height:300,channels:3,background:'#345678' } }).png().toBuffer()
+    const photo=`data:image/png;base64,${image.toString('base64')}`
+    const directory=`output/pdf/photos/${process.env.LATEX_RENDERER || 'tectonic'}`
+    await mkdir(directory,{ recursive:true })
+    const checks=await Promise.allSettled((['left','right'] as const).map(async photoPosition => {
+      const data=renderFixture()
+      data.basics.photoUrl=photo
+      data.appearance={ colorTheme:'template',font:'template',photoPosition }
+      const result=await renderCV(data,id,'multi-page',photo)
+      await writeFile(`${directory}/${id}-${photoPosition}.pdf`,result.bytes)
+      const parser=new PDFParse({ data:new Uint8Array(result.bytes) })
+      try {
+        const text=(await parser.getText()).text.toLowerCase()
+        for (const field of ['TechCorp','StartupXYZ','Education','Skills','Projects','Certifications','Awards','Languages','Community','coding club']) assert.ok(text.includes(field.toLowerCase()),`${id}/${photoPosition}: ${field}`)
+        assert.ok((await parser.getImage({ imageThreshold:0 })).pages.some(page => page.images.length>0))
+      } finally { await parser.destroy() }
+    }))
+    // Drain both native jobs even when an assertion fails so a failed case
+    // cannot occupy renderer slots and obscure later, independent failures.
+    for (const check of checks) if (check.status==='rejected') throw check.reason
+  })
+}
 test('custom palette and typeface compile with a photo and retain every section', { timeout:180000 },async () => {
   const data=renderFixture()
   data.appearance={ colorTheme:'burgundy',font:'sans' }
@@ -100,7 +125,7 @@ for (const id of ['creative','architect','editorial','executive','timeline']) {
 }
 test('published thumbnails are tied to the current renderer and fixture',async () => {
   const source = createHash('sha256')
-  for (const file of ['lib/latex/generator.ts','tests/fixtures/render.ts','lib/templates.ts','lib/types/cv.ts','lib/pdf/render.ts','lib/pdf/compiler.ts','scripts/install-tectonic-runtime-libs.mjs']) source.update((await readFile(file,'utf8')).replace(/\r\n/g,'\n'))
+  for (const file of ['lib/latex/generator.ts','tests/fixtures/render.ts','lib/templates.ts','lib/types/cv.ts','lib/pdf/render.ts','lib/pdf/compiler.ts','lib/pdf/photo.ts','scripts/install-tectonic-runtime-libs.mjs']) source.update((await readFile(file,'utf8')).replace(/\r\n/g,'\n'))
   const hash = source.digest('hex')
   const manifest = JSON.parse(await readFile('public/templates/manifest.json','utf8'))
   assert.equal(manifest.sourceHash,hash,'Regenerate thumbnails after changing the renderer, template catalogue or fixture')

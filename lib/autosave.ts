@@ -58,6 +58,8 @@ export class RevisionSaver<T> {
 
   flush(): Promise<void> { return this.enqueue(() => this.drain()) }
 
+  /** Read/export a persisted snapshot without intervening writes. Changes made
+   * during the operation stay dirty and are saved by the next queued flush. */
   exclusive<R>(operation: (snapshot: T, revision: number) => Promise<{ result: R; revision?: number }>): Promise<R> {
     return this.enqueue(async () => {
       await this.drain()

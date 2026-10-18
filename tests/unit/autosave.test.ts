@@ -49,3 +49,26 @@ test('snapshots wait for autosave and subsequent edits use the snapshot revision
   await saver.flush()
   assert.equal(saver.serverRevision,3)
 })
+
+test('export holds a revision while newer typing queues for the next save',async () => {
+  const release=deferred()
+  const calls:Array<[string,number]>=[]
+  const saver=new RevisionSaver('initial',0,async (value,revision) => { calls.push([value,revision]); return revision+1 })
+  saver.change('exported draft')
+  const exporting=saver.exclusive(async (snapshot,revision) => {
+    assert.equal(snapshot,'exported draft'); assert.equal(revision,1)
+    await release.promise
+    assert.equal(saver.serverRevision,1)
+    return { result:snapshot }
+  })
+  await new Promise(resolve => setImmediate(resolve))
+  saver.change('typed during export')
+  const saving=saver.flush()
+  await new Promise(resolve => setImmediate(resolve))
+  assert.deepEqual(calls,[['exported draft',0]])
+  release.resolve(1)
+  assert.equal(await exporting,'exported draft')
+  await saving
+  assert.deepEqual(calls,[['exported draft',0],['typed during export',1]])
+  assert.equal(saver.dirty,false)
+})

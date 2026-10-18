@@ -49,6 +49,18 @@ export function AppearanceSettings({ value,onChange }: {
             </SelectContent>
           </Select>
         </div>
+        <div className="space-y-2">
+          <Label htmlFor="cv-photo-position">Photo position</Label>
+          <Select value={appearance.photoPosition || 'template'} onValueChange={position => onChange({ ...appearance,photoPosition:position as Appearance['photoPosition'] })}>
+            <SelectTrigger id="cv-photo-position"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="template">Template default</SelectItem>
+              <SelectItem value="left">Left</SelectItem>
+              <SelectItem value="right">Right</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">Uploaded photos use a round centre crop. Sidebar templates keep the photo inside the identity column.</p>
+        </div>
         <Button variant="outline" onClick={() => onChange(undefined)}>Reset template style</Button>
       </DialogContent>
     </Dialog>

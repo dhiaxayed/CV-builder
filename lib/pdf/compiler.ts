@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { createCompiler } from 'node-latex-compiler'
-import sharp from 'sharp'
+import { circularPhoto } from './photo'
 import { AppError } from '@/lib/errors'
 
 export async function runLatexProcess(command: string, args: string[], cwd: string, env = process.env, timeoutMs = 45000) {
@@ -43,12 +43,7 @@ export async function compileLatexToPdf(latex: string, photoData?: string): Prom
   const dir = await fs.mkdtemp(path.join(tmpdir(), 'cv-pdf-'))
   try {
     if (photoData) {
-      const match = photoData.match(/^data:image\/(?:png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/)
-      if (!match || match[1].length > 7000000) throw new AppError(400, 'INVALID_PHOTO', 'Unable to render the CV photo.')
-      try {
-        const photo = await sharp(Buffer.from(match[1], 'base64'), { animated: false, limitInputPixels: 16000000 }).rotate().resize({ width: 256, height: 256, fit: 'inside', withoutEnlargement: true }).png().toBuffer()
-        await fs.writeFile(path.join(dir,'cv_photo.png'), photo)
-      } catch { throw new AppError(400, 'INVALID_PHOTO', 'Unable to render the CV photo.') }
+      await fs.writeFile(path.join(dir,'cv_photo.png'),await circularPhoto(photoData))
     }
     const tex = path.join(dir, 'cv.tex')
     await fs.writeFile(tex, latex, 'utf8')

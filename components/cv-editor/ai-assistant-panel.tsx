@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState, useCallback } from 'react'
+import { canReplaceAISummary, canReplaceAIExperience } from '@/lib/ai/editor-guards'
 import { AIAtsReview, AIJobTailorAnalysis } from '@/lib/ai/types'
 import { ATSReport, CVData } from '@/lib/types/cv'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -102,6 +103,9 @@ export function AIAssistantPanel({
   const [selected, setSelected] = useState<string[]>([])
   const toggle = (key: string) => setSelected(current => current.includes(key) ? current.filter(item => item !== key) : [...current,key])
   const [isTailorLoading, setIsTailorLoading] = useState(false)
+  const [reviewSource,setReviewSource]=useState<CVData|null>(null)
+  const [tailorSource,setTailorSource]=useState<CVData|null>(null)
+  const [condenseSource,setCondenseSource]=useState<CVData|null>(null)
   const [reviewData, setReviewData] = useState<ReviewResponse | null>(null)
   const [tailorData, setTailorData] = useState<TailorResponse | null>(null)
   const [reviewError, setReviewError] = useState<string | null>(null)
@@ -142,7 +146,7 @@ export function AIAssistantPanel({
       const response = await fetch('/api/ai/condense', { method:'POST',headers:{ 'Content-Type':'application/json' },body:JSON.stringify({ cvId,cvData:data }) })
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || 'Could not suggest reductions')
-      setCondensation(result)
+      setCondensation(result); setCondenseSource(data)
     } catch (error) { toast({ title:error instanceof Error ? error.message : 'Could not suggest reductions',variant:'destructive' }) }
     finally { setIsCondensing(false) }
   }
@@ -164,7 +168,7 @@ export function AIAssistantPanel({
         throw new Error(payload.error || 'Failed to generate AI ATS review')
       }
 
-      setReviewData(payload)
+      setReviewData(payload); setReviewSource(data)
       toast({
         title:
           payload.source === 'heuristic-fallback'
@@ -223,7 +227,7 @@ export function AIAssistantPanel({
         throw new Error(message)
       }
 
-      setTailorData(payload)
+      setTailorData(payload); setTailorSource(data); setSelected([])
       await loadJobHistory()
       toast({
         title:
@@ -253,6 +257,9 @@ export function AIAssistantPanel({
       </CardHeader>
       <CardContent className="flex-1 min-h-0 overflow-y-auto space-y-4">
         <p className="text-xs text-muted-foreground">AI actions send career content to the configured provider (Groq or OpenRouter), without your photo or contact details. Scores estimate content quality; they do not measure ATS certification or hiring probability. Review every proposed claim.</p>
+        {[reviewSource,tailorSource,condenseSource].some(source => source && JSON.stringify(source)!==JSON.stringify(data)) && (
+          <p role="status" className="rounded border bg-amber-50 p-2 text-xs text-amber-900">Your CV changed since these suggestions. Applied or manually edited fields are protected. Run the relevant action again for updated suggestions and scores.</p>
+        )}
         {!isProUser && <p className="text-xs"><a className="underline" href={PRO_CONTACT_URL}>Contact Us to Upgrade to Pro</a>. Online payment integration coming soon.</p>}
         <div className="space-y-3 rounded border p-3">
           <p className="font-medium text-sm">Fit a readable page</p>
@@ -260,12 +267,12 @@ export function AIAssistantPanel({
           {condensation && <div className="space-y-3 text-xs">
             <p>{condensation.source !== 'heuristic-fallback' ? 'AI suggestions' : 'Local wording suggestions'}: {condensation.explanation}</p>
             <p><strong>Current summary:</strong> {data.summary}</p><p><strong>Proposed:</strong> {condensation.summary}</p>
-            <Button size="sm" variant="outline" disabled={condensation.summary === data.summary} onClick={() => onApplySummary(condensation.summary)}>Apply shorter summary</Button>
+            <Button size="sm" variant="outline" disabled={!canReplaceAISummary(data,condenseSource,condensation.summary)} onClick={() => onApplySummary(condensation.summary)}>Apply shorter summary</Button>
             {condensation.experienceRewrites.map(rewrite => <div className="space-y-2 border-t pt-2" key={rewrite.experienceId}>
               <p>{data.experience.find(item => item.id === rewrite.experienceId)?.role}</p>
               <p><strong>Current:</strong> {data.experience.find(item => item.id === rewrite.experienceId)?.bullets.join('; ')}</p>
               <p><strong>Proposed:</strong> {rewrite.bullets.join('; ')}</p><p>{rewrite.rationale}</p>
-              <Button size="sm" variant="outline" disabled={JSON.stringify(rewrite.bullets) === JSON.stringify(data.experience.find(item => item.id === rewrite.experienceId)?.bullets)} onClick={() => onApplyExperienceBullets(rewrite.experienceId,rewrite.bullets)}>Apply shorter bullets</Button>
+              <Button size="sm" variant="outline" disabled={!canReplaceAIExperience(data,condenseSource,rewrite.experienceId,rewrite.bullets)} onClick={() => onApplyExperienceBullets(rewrite.experienceId,rewrite.bullets)}>Apply shorter bullets</Button>
             </div>)}
             <Button variant="ghost" size="sm" onClick={() => setCondensation(null)}>Dismiss reduction suggestions</Button>
             <p>After applying, open Preview to compile and verify the page count. Use Undo AI change to recover earlier wording.</p>
@@ -398,7 +405,7 @@ export function AIAssistantPanel({
                     Rewritten Summary
                   </div>
                   <p className="text-xs text-muted-foreground"><strong>Current:</strong> {data.summary}</p><p className="text-xs text-muted-foreground"><strong>Proposed:</strong> {reviewData.review.rewrittenSummary}</p>
-                  <Button size="sm" variant="outline" disabled={reviewData.review.rewrittenSummary === data.summary} onClick={() => onApplySummary(reviewData.review.rewrittenSummary)}>
+                  <Button size="sm" variant="outline" disabled={!canReplaceAISummary(data,reviewSource,reviewData.review.rewrittenSummary)} onClick={() => onApplySummary(reviewData.review.rewrittenSummary)}>
                     Apply Summary
                   </Button>
                 </div>
@@ -554,13 +561,13 @@ export function AIAssistantPanel({
                   <p className="text-xs text-muted-foreground"><strong>Current:</strong> {data.summary}</p><p className="text-xs text-muted-foreground"><strong>Proposed:</strong> {tailorData.analysis.tailoredSummary}</p>
                   <label className="flex gap-2 text-xs"><input type="checkbox" checked={selected.includes('summary')} onChange={() => toggle('summary')} />Include proposed summary</label>
                   <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => onApplySummary(tailorData.analysis.tailoredSummary)}>
+                    <Button size="sm" variant="outline" disabled={!canReplaceAISummary(data,tailorSource,tailorData.analysis.tailoredSummary)} onClick={() => onApplySummary(tailorData.analysis.tailoredSummary)}>
                       Apply Summary
                     </Button>
                     <Button
                       size="sm"
                       variant="outline"
-                      disabled={selected.length === 0}
+                      disabled={selected.length===0 || (selected.includes('summary') && !canReplaceAISummary(data,tailorSource,tailorData.analysis.tailoredSummary)) || tailorData.analysis.experienceRewrites.some(rewrite => selected.includes(`experience:${rewrite.experienceId}`) && !canReplaceAIExperience(data,tailorSource,rewrite.experienceId,rewrite.bullets))}
                       onClick={() =>
                         onApplyTailoredPackage({
                           summary: selected.includes('summary') ? tailorData.analysis.tailoredSummary : data.summary,
@@ -601,6 +608,7 @@ export function AIAssistantPanel({
                           <Button
                             size="sm"
                             variant="outline"
+                            disabled={!canReplaceAIExperience(data,tailorSource,rewrite.experienceId,rewrite.bullets)}
                             onClick={() => onApplyExperienceBullets(rewrite.experienceId, rewrite.bullets)}
                           >
                             Apply Bullets

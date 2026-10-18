@@ -47,11 +47,12 @@ export function SectionBasics({ data, onChange, onPhotoUpload }: SectionBasicsPr
   
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
+    e.target.value = ''
     if (!file) return
     
     // Validate file type
-    if (!file.type.startsWith('image/')) {
-      toast({ title: 'Please select an image file', variant: 'destructive' })
+    if (!['image/jpeg','image/png','image/webp'].includes(file.type)) {
+      toast({ title: 'Please select a JPEG, PNG or WebP image', variant: 'destructive' })
       return
     }
     
@@ -118,17 +119,17 @@ export function SectionBasics({ data, onChange, onPhotoUpload }: SectionBasicsPr
         {/* Photo Upload Section */}
         <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
           <Avatar className="h-20 w-20 border-2 border-primary/20">
-            <AvatarImage src={data.photoUrl} alt={data.name} />
+            <AvatarImage src={data.photoUrl} alt={data.name} className="object-cover object-center" />
             <AvatarFallback className="text-lg bg-primary/10">
               {data.name ? getInitials(data.name) : <User className="h-8 w-8 text-muted-foreground" />}
             </AvatarFallback>
           </Avatar>
-          <div className="flex-1">
+          <div className="min-w-0 flex-1">
             <p className="text-sm font-medium mb-1">Profile Photo</p>
             <p className="text-xs text-muted-foreground mb-3">
-              Add a professional photo to make your CV stand out. JPEG, PNG or WebP up to 4MB.
+              Optional round photo. JPEG, PNG or WebP up to 4MB. Adjust its position in Style.
             </p>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <input
                 ref={fileInputRef}
                 type="file"

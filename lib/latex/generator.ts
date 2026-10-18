@@ -114,19 +114,25 @@ export function generateLatex(data: CVData, template: string, density: RenderDen
   const nameSize = design.layout === 'identity-rail' ? Math.min(23,design.nameSize) : design.nameSize
   const name = `{\\fontsize{${nameSize}}{${nameSize+3}}\\selectfont\\bfseries${design.mono ? '\\ttfamily' : ''}\\color{${design.header === 'contrast' ? 'white' : 'accent'}}${escapeLatex(data.basics.name || 'Your Name')}\\par}`
   const title = `{\\large ${escapeLatex(data.basics.title || 'Curriculum Vitae')}\\par}`
-  const photo = data.basics.photoUrl ? '\\includegraphics[width=1.8cm,height=1.8cm,keepaspectratio]{cv_photo.png}\\par' : ''
+  const photo = data.basics.photoUrl ? '\\includegraphics[width=1.8cm,height=1.8cm]{cv_photo.png}' : ''
   const identity = `${name}\\par\\vspace{2pt}${title}\\par\\vspace{3pt}{${contacts}}`
-  const railIdentity = `${photo}${name}\\par\\vspace{4pt}${title}\\par\\vspace{9pt}{${contactItems.join('\\par\\vspace{2pt}')}}\\par\\vspace{8pt}`
-  const header = design.header === 'band' ? `\\colorbox{accent!8}{\\parbox{\\dimexpr\\linewidth-2\\fboxsep\\relax}{${photo}${identity}}}`
-    : design.header === 'contrast' ? `\\colorbox{accent}{\\parbox{\\dimexpr\\linewidth-2\\fboxsep\\relax}{\\color{white}${photo}${identity}}}`
-    : design.header === 'framed' ? `\\fcolorbox{accent}{white}{\\parbox{\\dimexpr\\linewidth-2\\fboxsep-2\\fboxrule\\relax}{\\centering${photo}${identity}}}`
-    : design.header === 'ledger' ? `\\begin{tabularx}{\\linewidth}{@{}p{0.42\\linewidth} >{\\raggedleft\\arraybackslash}X@{}}${name}\\par
-${title} & {\\small ${photo}${contacts}}\\\\\\end{tabularx}\\par{\\color{accent}\\rule{\\linewidth}{0.8pt}}`
+  const photoLeft=data.appearance?.photoPosition==='left'
+  const photoCell=`\\begin{minipage}[c]{1.8cm}${photo}\\end{minipage}`
+  const identityCell=`\\begin{minipage}[c]{\\linewidth}\\RaggedRight${identity}\\end{minipage}`
+  const headerIdentity=photo ? `\\begin{tabularx}{\\linewidth}{@{}${photoLeft ? 'p{1.8cm}@{\\hspace{0.4cm}}X' : 'X@{\\hspace{0.4cm}}p{1.8cm}'}@{}}${photoLeft ? `${photoCell} & ${identityCell}` : `${identityCell} & ${photoCell}`}\\end{tabularx}` : identity
+  const railPhoto=photo ? `{${data.appearance?.photoPosition==='left' ? '\\raggedright' : data.appearance?.photoPosition==='right' ? '\\raggedleft' : '\\centering'}${photo}\\par}\\vspace{4pt}` : ''
+  const railIdentity = `${railPhoto}${name}\\par\\vspace{4pt}${title}\\par\\vspace{9pt}{${contactItems.join('\\par\\vspace{2pt}')}}\\par\\vspace{8pt}`
+  const ledgerIdentity=photo ? headerIdentity : `\\begin{tabularx}{\\linewidth}{@{}p{0.42\\linewidth} >{\\raggedleft\\arraybackslash}X@{}}${name}\\par
+${title} & {\\small ${contacts}}\\\\\\end{tabularx}`
+  const header = design.header === 'band' ? `\\colorbox{accent!8}{\\parbox{\\dimexpr\\linewidth-2\\fboxsep\\relax}{${headerIdentity}}}`
+    : design.header === 'contrast' ? `\\colorbox{accent}{\\parbox{\\dimexpr\\linewidth-2\\fboxsep\\relax}{\\color{white}${headerIdentity}}}`
+    : design.header === 'framed' ? `\\fcolorbox{accent}{white}{\\parbox{\\dimexpr\\linewidth-2\\fboxsep-2\\fboxrule\\relax}{\\centering${headerIdentity}}}`
+    : design.header === 'ledger' ? `${ledgerIdentity}\\par{\\color{accent}\\rule{\\linewidth}{0.8pt}}`
     : design.header === 'split' ? photo
-      ? `\\begin{tabularx}{\\linewidth}{@{}X r@{}}\\parbox[t]{0.75\\linewidth}{${identity}} & \\includegraphics[width=1.8cm,height=1.8cm,keepaspectratio]{cv_photo.png}\\end{tabularx}`
+      ? headerIdentity
       : `${identity}\\par\\vspace{4pt}{\\color{accent}\\rule{0.22\\linewidth}{2pt}}`
-    : design.header === 'masthead' ? `\\begin{center}\\color{accent}\\rule{\\linewidth}{1.2pt}\\par\\vspace{5pt}${photo}${identity}\\par\\vspace{5pt}\\rule{\\linewidth}{0.4pt}\\end{center}`
-    : design.header === 'center' ? `\\begin{center}${photo}${identity}\\end{center}` : `${photo}${identity}`
+    : design.header === 'masthead' ? `\\begin{center}\\color{accent}\\rule{\\linewidth}{1.2pt}\\par\\vspace{5pt}${headerIdentity}\\par\\vspace{5pt}\\rule{\\linewidth}{0.4pt}\\end{center}`
+    : design.header === 'center' ? `\\begin{center}${headerIdentity}\\end{center}` : headerIdentity
 
   const content: Partial<Record<keyof CVData,string>> = {
     summary: section('Profile',escapeLatex(data.summary)),

@@ -30,9 +30,11 @@ jobs:
           python-version: '3.13'
       - run: python -m pip install -r scripts/requirements-pdf.txt
       - run: python scripts/check-pdf-layout.py output/pdf/system-templates
+      - run: python scripts/check-photo-layout.py output/pdf/photos/system
       - run: pnpm build
       - run: LATEX_RENDERER=tectonic pnpm test:pdf
       - run: python scripts/check-pdf-layout.py
+      - run: python scripts/check-photo-layout.py
       - run: node scripts/verify-function-bundles.mjs
       - run: pnpm test:production
       - run: E2E_DATABASE_KEY_TYPE=secret pnpm test:production

@@ -13,7 +13,7 @@ async function main() {
   await mkdir('output/pdf/templates',{ recursive:true })
   const source = createHash('sha256')
   // Git checkouts use different line endings on Windows and Linux.
-  for (const file of ['lib/latex/generator.ts','tests/fixtures/render.ts','lib/templates.ts','lib/types/cv.ts','lib/pdf/render.ts','lib/pdf/compiler.ts','scripts/install-tectonic-runtime-libs.mjs']) source.update((await readFile(file,'utf8')).replace(/\r\n/g,'\n'))
+  for (const file of ['lib/latex/generator.ts','tests/fixtures/render.ts','lib/templates.ts','lib/types/cv.ts','lib/pdf/render.ts','lib/pdf/compiler.ts','lib/pdf/photo.ts','scripts/install-tectonic-runtime-libs.mjs']) source.update((await readFile(file,'utf8')).replace(/\r\n/g,'\n'))
   const sourceHash = source.digest('hex')
   const matrix = []
   for (let offset=0; offset<TEMPLATES.length; offset+=2) {

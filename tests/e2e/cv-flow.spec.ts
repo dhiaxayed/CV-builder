@@ -72,7 +72,7 @@ test('AI fallback, selective application, undo, photo persistence and real PDF e
   const pdfPending = page.waitForEvent('download')
   await downloads.nth(0).click()
   expect((await pdfPending).suggestedFilename()).toMatch(/\.pdf$/)
-  for (const [index,extension] of [[1,'tex'],[2,'json']] as const) {
+  for (const [index,extension] of [[1,'zip'],[2,'json']] as const) {
     const pending = page.waitForEvent('download')
     await downloads.nth(index).click()
     expect((await pending).suggestedFilename()).toMatch(new RegExp(`\\.${extension}$`))

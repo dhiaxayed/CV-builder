@@ -7,13 +7,14 @@ import { photoDataForOwner } from '@/lib/server/photo-data'
 import { rateLimit } from '@/lib/server/rate-limit'
 import { renderCV, PDFOverflowError } from '@/lib/pdf/render'
 import { AppError } from '@/lib/errors'
+import { latexPackage } from '@/lib/pdf/source'
 
 export const runtime = 'nodejs'
 export const maxDuration = 300
 const inputSchema = z.object({
   cvData: cvDataSchema.optional(), cvId: z.string().min(1).max(100).optional(),
   expectedRevision: revisionSchema.optional(), templateId: templateIdSchema.default('modern'),
-  title: z.string().max(255).optional(), format: z.enum(['pdf','latex','json']).default('pdf'),
+  title: z.string().max(255).optional(), format: z.enum(['pdf','latex','latex-bundle','json']).default('pdf'),
   pageMode: z.enum(['one-page','multi-page']).default('one-page'), intent: z.enum(['preview','export']).default('export'),
 }).strict()
 
@@ -42,6 +43,7 @@ export async function POST(request: Request) {
     }
     await rateLimit(`pdf:${input.intent}:${user.id}`,input.intent === 'preview' ? 60 : 20,60)
     const rendered = await renderCV(data,template,input.pageMode,photo)
+    if (input.format === 'latex-bundle') return new NextResponse(Buffer.from(await latexPackage(rendered.latex,photo)),{ headers:{ ...headers,'Content-Type':'application/zip','Content-Disposition':`attachment; filename="${filename}.zip"` } })
     if (input.format === 'latex') return new NextResponse(rendered.latex,{ headers:{ ...headers,'Content-Type':'text/plain; charset=utf-8','Content-Disposition':`attachment; filename="${filename}.tex"` } })
     if (input.cvId && input.intent === 'export') await recordCVExport(input.cvId,user.id)
     return new NextResponse(Buffer.from(rendered.bytes),{ headers:{ ...headers,
