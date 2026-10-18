@@ -4,7 +4,7 @@ Application Next.js / React / TypeScript pour créer des CV, enregistrer des ver
 
 ## Développement
 
-Node.js 22.16+ et pnpm 10.13.1 sont requis.
+Node.js 22.x (au moins 22.16) et pnpm 10.13.1 sont requis. La version majeure Node est fixée pour Vercel, et les scripts d'installation des dépendances nécessaires sont autorisés explicitement.
 
 ```sh
 pnpm install --frozen-lockfile

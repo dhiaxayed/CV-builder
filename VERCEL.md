@@ -5,6 +5,7 @@ Vercel remains the production host. No VPS, container, additional authentication
 ## Build and runtime
 
 - Framework: Next.js; Node.js 22.x (at least 22.16).
+- `engines.node` is fixed to `22.x`, matching CI and Docker, so Vercel will not select a new major automatically. pnpm 10.13.1 explicitly permits only the `esbuild` and `unrs-resolver` dependency install scripts; other dependency scripts remain blocked by default.
 - Install: `pnpm install --frozen-lockfile`; build: `pnpm build`.
 - Vercel builds first perform a read-only database readiness check: required columns and all eight application RPCs must be available with the server credential. An unavailable database, missing migrations or disabled PostgREST OpenAPI metadata stops the build before promotion. This never applies SQL or reads CV records; it does not replace the privileged grants/RLS verification. Local/CI builds without Vercel environment indicators skip this hosted check.
 - Keep the repository's `postinstall`: on Linux x64 it installs SHA-256-verified portable Tectonic 0.16.9 into `vendor/tectonic-linux-x64/bin`. `pnpm build` then compiles every design with both typefaces and a synthetic photo to prepare `vendor/tectonic-cache`. The same version is installed on Windows x64 for local verification. Custom download URLs/versions require `TECTONIC_SHA256`. Build failure stops deployment if these resources cannot compile.
@@ -39,6 +40,8 @@ If the build reports `Missing deployment configuration`, the listed variable is 
 3. Save and **Redeploy**. Environment changes affect new deployments only; see [Vercel environment variables](https://vercel.com/docs/environment-variables/managing-environment-variables).
 
 The application still requires migrations 003/004 and verified permissions. Supplying a key does not apply SQL or bypass the schema check.
+
+The previous application used `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY` as a fallback for privileged queries. The hardened version deliberately removed that behavior: migration 003 denies browser roles access to private tables and application RPCs. The public key cannot supply the server permissions required by that schema. `Enable access to System Environment Variables` exposes Vercel deployment metadata; it does not create or replace a Supabase server key.
 
 ## Database rollout
 

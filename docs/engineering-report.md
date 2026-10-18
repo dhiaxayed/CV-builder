@@ -106,6 +106,8 @@ Les six palettes supplémentaires et les choix serif/sans serif sont indépendan
 
 Exécutions locales sous Windows x64, Node.js 23.8.0, pnpm 10.13.1 et Python 3.13.3. La CI et les instructions Vercel ciblent Node.js 22. La [CI Linux du commit `556f4e6`](https://github.com/dhiaxayed/CV-builder/actions/runs/39071405882) a terminé avec succès sur GitHub ; cela ne valide pas la configuration Supabase du compte Vercel.
 
+Vérification complémentaire du 18 octobre 2026 avec Node.js 22.23.3, téléchargé depuis nodejs.org et vérifié par SHA-256 : installation avec lockfile figé réussie, `pnpm ignored-builds` indique `None`, types/lint/23 tests/build et contrôle des bundles réussis. Le parcours `next start` avec authentification, PDF natif, source et révocation réussit également (1/1). `engines.node` est fixé à `22.x` et seuls les scripts d'installation d'`esbuild` et d'`unrs-resolver` sont autorisés. La [CI Linux du correctif Supabase `9dc89e3`](https://github.com/dhiaxayed/CV-builder/actions/runs/39086054388) a aussi réussi ; le déploiement Vercel correspondant est en échec et la clé serveur reste absente de l'environnement local fourni.
+
 | Commande / contrôle | Résultat observé |
 | --- | --- |
 | `pnpm typecheck` | Réussi |

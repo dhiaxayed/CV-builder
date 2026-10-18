@@ -102,7 +102,13 @@
     "typescript": "^5.9.3"
   },
   "engines": {
-    "node": ">=22.16.0"
+    "node": "22.x"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "unrs-resolver"
+    ]
   },
   "packageManager": "pnpm@10.13.1"
 }
