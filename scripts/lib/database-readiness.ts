@@ -15,32 +15,47 @@ const requiredFunctions = [
   'restore_cv', 'publish_cv', 'take_rate_limit', 'save_photo',
 ]
 
-/** Read schema metadata and zero rows only. Never run a migration or invoke an RPC. */
+/** Optional read-only diagnostic supporting the original and migrated schemas. */
 export async function verifyDatabaseReadiness(env: DatabaseEnvironment, request: typeof fetch = fetch) {
   const databaseUrl = env.SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL
   const serviceKey = serverDatabaseKey(env)
   if (!databaseUrl || !serviceKey) {
     const missing = [
       ...(!databaseUrl ? ['SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL'] : []),
-      ...(!serviceKey ? ['SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY (server-only)'] : []),
+      ...(!serviceKey ? ['SUPABASE_SECRET_KEY, SUPABASE_SERVICE_ROLE_KEY or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY'] : []),
     ]
-    throw new Error(`Missing deployment configuration: ${missing.join('; ')}. Add the missing variables in Vercel Settings > Environment Variables for this deployment environment, then redeploy. A publishable/anon key cannot replace a server credential.`)
+    throw new Error(`Missing deployment configuration: ${missing.join('; ')}. Configure the existing Supabase URL and key for this deployment environment.`)
   }
 
   const root = new URL('/rest/v1/', databaseUrl)
   // Modern secret keys are not JWTs. Legacy service-role keys also need Bearer.
   const headers: Record<string, string> = { apikey: serviceKey }
-  if (!serviceKey.startsWith('sb_secret_')) headers.Authorization = `Bearer ${serviceKey}`
+  if (!/^sb_(secret|publishable)_/.test(serviceKey)) headers.Authorization = `Bearer ${serviceKey}`
   // One deadline covers every request, including the metadata response body.
   const signal = AbortSignal.timeout(15_000)
   try {
-    await Promise.all(Object.entries(requiredTables).map(async ([table, columns]) => {
+    const readTable = async (table: string, columns: string) => {
       const endpoint = new URL(table, root)
       endpoint.searchParams.set('select', columns)
       endpoint.searchParams.set('limit', '0')
       const response = await request(endpoint, { headers, signal, cache: 'no-store', redirect: 'error' })
+      if (!response.ok) {
+        const body = await response.json() as { code?: string }
+        return body.code || 'UNAVAILABLE'
+      }
       await response.body?.cancel()
-      if (!response.ok) throw new Error(`Required database schema is unavailable: ${table}.`)
+      return null
+    }
+    const probe = await readTable('cvs', requiredTables.cvs)
+    if (probe === '42703' || probe === 'PGRST204') {
+      for (const [table, columns] of Object.entries({ cvs: 'id,current_version_id', cv_versions: 'id,cv_id,version,data', users: 'id,plan_tier' })) {
+        if (await readTable(table, columns)) throw new Error(`Required database schema is unavailable: ${table}.`)
+      }
+      return { schema: 'legacy' as const }
+    }
+    if (probe) throw new Error('Required database schema is unavailable: cvs.')
+    await Promise.all(Object.entries(requiredTables).filter(([table]) => table !== 'cvs').map(async ([table, columns]) => {
+      if (await readTable(table, columns)) throw new Error(`Required database schema is unavailable: ${table}.`)
     }))
 
     const response = await request(root, {
@@ -50,10 +65,11 @@ export async function verifyDatabaseReadiness(env: DatabaseEnvironment, request:
     const metadata = await response.json() as { paths?: Record<string, unknown> }
     const missing = requiredFunctions.filter(name => !metadata?.paths?.[`/rpc/${name}`])
     if (missing.length) throw new Error(`Required database functions are unavailable: ${missing.join(', ')}.`)
+    return { schema: 'migrated' as const }
   } catch (error) {
     // Never print transport errors: they can include connection URLs/headers.
     const message = error instanceof Error && /^(Required database|Database RPC metadata)/.test(error.message)
       ? error.message : 'Database readiness could not be verified within the request deadline.'
-    throw new Error(`${message} Apply migrations 003/004 and verify permissions before deploying.`)
+    throw new Error(`${message} Verify the database configuration and permissions for the selected schema.`)
   }
 }

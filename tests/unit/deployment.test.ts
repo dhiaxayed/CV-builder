@@ -31,19 +31,38 @@ test('deployment readiness refuses missing credentials, schema and RPCs', async 
   await assert.rejects(verifyDatabaseReadiness({}), /SUPABASE_URL.*SUPABASE_SECRET_KEY.*SUPABASE_SERVICE_ROLE_KEY/)
   await assert.rejects(verifyDatabaseReadiness({ SUPABASE_URL: env.SUPABASE_URL }), error => {
     assert.ok(error instanceof Error)
-    assert.match(error.message, /Missing deployment configuration: SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY/)
-    assert.match(error.message, /Vercel Settings > Environment Variables.*redeploy/)
+    assert.match(error.message, /Missing deployment configuration: SUPABASE_SECRET_KEY.*SUPABASE_SERVICE_ROLE_KEY.*NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY/)
     return true
   })
   await assert.rejects(verifyDatabaseReadiness({ SUPABASE_SERVICE_ROLE_KEY: 'server-test-key' }), /Missing deployment configuration: SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL\./)
-  await assert.rejects(verifyDatabaseReadiness(env, async () => Response.json({}, { status: 400 })), /Required database schema.*migrations 003\/004/)
+  await assert.rejects(verifyDatabaseReadiness(env, async () => Response.json({}, { status: 400 })), /Required database schema.*configuration and permissions/)
   await assert.rejects(verifyDatabaseReadiness(env, async () => Response.json({ paths: {} })), /Required database functions.*save_photo/)
 })
 
-test('server credential resolution supports modern and legacy keys without a public fallback', () => {
+test('database key resolution restores the original public fallback after optional server credentials', () => {
   assert.equal(serverDatabaseKey({ SUPABASE_SECRET_KEY: ' modern ', SUPABASE_SERVICE_ROLE_KEY: 'legacy' }), 'modern')
   assert.equal(serverDatabaseKey({ SUPABASE_SECRET_KEY: ' ', SUPABASE_SERVICE_ROLE_KEY: ' legacy ' }), 'legacy')
-  assert.equal(serverDatabaseKey({ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: 'public', NEXT_PUBLIC_SUPABASE_ANON_KEY: 'anon' }), undefined)
+  assert.equal(serverDatabaseKey({ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: 'public', NEXT_PUBLIC_SUPABASE_ANON_KEY: 'anon' }), 'public')
+  assert.equal(serverDatabaseKey({ NEXT_PUBLIC_SUPABASE_ANON_KEY: 'anon' }), 'anon')
+  assert.equal(serverDatabaseKey({ SUPABASE_SERVICE_ROLE_KEY: 'service', NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: 'public' }), 'service')
+})
+
+test('read-only readiness accepts the original schema and publishable key without newer RPCs', async () => {
+  const originalEnv = { NEXT_PUBLIC_SUPABASE_URL: env.SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: 'sb_publishable_test-only' }
+  let requests = 0
+  const result = await verifyDatabaseReadiness(originalEnv, async (input, init) => {
+    const url = new URL(String(input))
+    const headers = new Headers(init?.headers)
+    assert.equal(headers.get('apikey'), originalEnv.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY)
+    assert.equal(headers.has('authorization'), false)
+    assert.equal(url.searchParams.get('limit'), '0')
+    assert.notEqual(url.pathname, '/rest/v1/')
+    requests++
+    return url.searchParams.get('select')?.includes('draft_data')
+      ? Response.json({ code: '42703' }, { status: 400 }) : Response.json([])
+  })
+  assert.equal(result.schema, 'legacy')
+  assert.equal(requests, 4)
 })
 
 test('deployment readiness accepts modern secret keys through apikey without treating them as JWTs', async () => {

@@ -7,6 +7,8 @@ import { requireUser, assertSameOrigin, apiError } from '@/lib/server/api'
 import { rateLimit } from '@/lib/server/rate-limit'
 import { AppError, databaseError } from '@/lib/errors'
 import { imageSignature, MAX_PHOTO_BYTES } from '@/lib/photos'
+import { usesLegacySchema } from '@/lib/db/schema'
+import { savePhoto } from '@/lib/db/legacy-cvs'
 
 export const runtime = 'nodejs'
 
@@ -55,12 +57,17 @@ export async function POST(request: Request) {
       if ((meta.pages || 1) > 1 || !meta.width || !meta.height || meta.width > 8000 || meta.height > 8000) throw new Error('Dimensions')
       optimized = await image.rotate().resize({ width: 512, height: 512, fit: 'inside', withoutEnlargement: true }).webp({ quality: 82 }).toBuffer()
     } catch { throw new AppError(400, 'INVALID_PHOTO', 'The image is malformed, animated, or exceeds 16 megapixels.') }
+    const dataUrl = `data:image/webp;base64,${optimized.toString('base64')}`
     const fileId = nanoid()
+    const fileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_').slice(0, 200)
+    if (await usesLegacySchema()) {
+      return NextResponse.json({ success: true, ...await savePhoto(user.id, target, target === 'cv' ? cvId as string : null, revision, { id: fileId, dataUrl, name: fileName, size: optimized.length }) })
+    }
     const { data, error } = await requireDatabase().rpc('save_photo', {
       p_user_id: user.id, p_target: target, p_cv_id: target === 'cv' ? cvId : null,
       p_expected_revision: target === 'cv' ? revision : null, p_file_id: fileId,
-      p_data_url: `data:image/webp;base64,${optimized.toString('base64')}`,
-      p_name: file.name.replace(/[^a-zA-Z0-9.-]/g, '_').slice(0, 200), p_size: optimized.length,
+      p_data_url: dataUrl,
+      p_name: fileName, p_size: optimized.length,
     })
     if (error) databaseError(error)
     if (!data) throw new AppError(503, 'PERSISTENCE_FAILED', 'Photo persistence was not confirmed.')

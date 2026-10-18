@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "tsx scripts/check-deployment.ts && tsx scripts/prepare-latex-cache.ts && next build",
+    "build": "tsx scripts/prepare-latex-cache.ts && next build",
     "dev": "next dev",
     "lint": "eslint .",
     "postinstall": "node scripts/install-tectonic-runtime-libs.mjs",
@@ -17,12 +17,14 @@
     "templates:generate": "tsx scripts/prepare-latex-cache.ts && tsx scripts/generate-template-previews.ts",
     "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build",
     "db:check": "tsx scripts/run-migration.ts",
+    "db:check:deployment": "tsx scripts/check-deployment.ts",
     "test:ai:live": "tsx scripts/smoke-ai.ts",
     "check:bundles": "node scripts/verify-function-bundles.mjs",
     "pdf:prepare": "tsx scripts/prepare-latex-cache.ts",
     "test:e2e:ai:live": "tsx scripts/smoke-ai-browser.ts",
     "db:check:public": "tsx scripts/check-public-access.ts",
-    "test:production": "tsx scripts/smoke-production.ts"
+    "test:production": "tsx scripts/smoke-production.ts",
+    "test:production:legacy": "tsx scripts/smoke-production.ts --legacy"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

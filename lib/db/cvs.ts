@@ -4,8 +4,11 @@ import { nanoid } from 'nanoid'
 import { AppError, databaseError } from '@/lib/errors'
 import { photoDataForOwner } from '@/lib/server/photo-data'
 import { cvDataSchema } from '@/lib/validation/cv'
+import { usesLegacySchema } from './schema'
+import * as legacy from './legacy-cvs'
 
 export async function getUserCVs(userId: string): Promise<Array<Omit<DbCV, 'draft_data'> & { draft_name: string | null; draft_title: string | null }>> {
+  if (await usesLegacySchema()) return legacy.getUserCVs(userId)
   const { data, error } = await requireDatabase().from('cvs')
     .select('id,user_id,title,template_id,current_version_id,revision,is_public,share_token,photo_url,ats_score,view_count,last_exported_at,created_at,updated_at,draft_name:draft_data->basics->>name,draft_title:draft_data->basics->>title')
     .eq('user_id', userId).order('updated_at', { ascending: false })
@@ -15,6 +18,7 @@ export async function getUserCVs(userId: string): Promise<Array<Omit<DbCV, 'draf
 
 // Ownership is part of every private read, including reads used by exports and AI.
 export async function getCVWithCurrentVersion(cvId: string, userId: string): Promise<DbCV | null> {
+  if (await usesLegacySchema()) return legacy.getCV(cvId, userId)
   const { data, error } = await requireDatabase().from('cvs').select('*').eq('id', cvId).eq('user_id', userId).maybeSingle()
   if (error) databaseError(error)
   if (!data) return null
@@ -22,14 +26,16 @@ export async function getCVWithCurrentVersion(cvId: string, userId: string): Pro
 }
 
 export async function getCV(cvId: string, userId: string): Promise<(DbCV & { versions: DbCVVersion[] }) | null> {
+  if (await usesLegacySchema()) return legacy.getCVHistory(cvId, userId)
   const cv = await getCVWithCurrentVersion(cvId, userId)
   if (!cv) return null
-  const { data, error } = await requireDatabase().from('cv_versions').select('*').eq('cv_id', cvId).order('version', { ascending: false })
+  const { data, error } = await requireDatabase().from('cv_versions').select('*').eq('cv_id', cvId).gt('version', 0).order('version', { ascending: false })
   if (error) databaseError(error)
-  return { ...cv, versions: (data || []).map(version => ({ ...version, data: cvDataSchema.parse(version.data) })) as DbCVVersion[] }
+  return { ...cv, versions: (data || []).map(version => ({ ...version, template_id: version.template_id ?? legacy.templateForVersion(version.data, cv.template_id), data: cvDataSchema.parse(version.data) })) as DbCVVersion[] }
 }
 
 export async function getCVByShareToken(token: string) {
+  if (await usesLegacySchema()) return legacy.getPublishedCV(token)
   const { data, error } = await requireDatabase().from('cvs')
     .select('published_title,published_template_id,published_data').eq('share_token', token).eq('is_public', true).maybeSingle()
   if (error) databaseError(error)
@@ -39,6 +45,7 @@ export async function getCVByShareToken(token: string) {
 
 export async function createCV(userId: string, title: string, templateId = 'modern', initialData?: CVData): Promise<DbCV> {
   if (initialData) await photoDataForOwner(initialData.basics.photoUrl, userId)
+  if (await usesLegacySchema()) return legacy.createCV(userId, title, templateId, initialData || createEmptyCVData())
   const { data, error } = await requireDatabase().rpc('create_cv_atomic', {
     p_user_id: userId, p_title: title, p_template_id: templateId, p_data: initialData || createEmptyCVData(),
   })
@@ -49,6 +56,7 @@ export async function createCV(userId: string, title: string, templateId = 'mode
 
 export async function updateCVData(cvId: string, userId: string, expectedRevision: number, updates: { data?: CVData; title?: string; templateId?: string }): Promise<DbCV> {
   if (updates.data) await photoDataForOwner(updates.data.basics.photoUrl, userId)
+  if (await usesLegacySchema()) return legacy.updateCV(cvId, userId, expectedRevision, updates)
   const { data, error } = await requireDatabase().rpc('save_cv_draft', {
     p_cv_id: cvId, p_user_id: userId, p_expected_revision: expectedRevision,
     p_data: updates.data ?? null, p_title: updates.title ?? null, p_template_id: updates.templateId ?? null,
@@ -59,6 +67,7 @@ export async function updateCVData(cvId: string, userId: string, expectedRevisio
 }
 
 export async function createCVVersion(cvId: string, userId: string, expectedRevision: number, note?: string): Promise<{ version: DbCVVersion; revision: number }> {
+  if (await usesLegacySchema()) return legacy.snapshotCV(cvId, userId, expectedRevision, note)
   const { data, error } = await requireDatabase().rpc('snapshot_cv', { p_cv_id: cvId, p_user_id: userId, p_expected_revision: expectedRevision, p_note: note || null })
   if (error) databaseError(error)
   if (!data) throw new AppError(503, 'PERSISTENCE_FAILED', 'Snapshot creation was not confirmed.')
@@ -66,6 +75,7 @@ export async function createCVVersion(cvId: string, userId: string, expectedRevi
 }
 
 export async function restoreCVVersion(cvId: string, userId: string, versionId: string, expectedRevision: number): Promise<DbCV> {
+  if (await usesLegacySchema()) return legacy.restoreCV(cvId, userId, versionId, expectedRevision)
   const { data, error } = await requireDatabase().rpc('restore_cv', { p_cv_id: cvId, p_user_id: userId, p_version_id: versionId, p_expected_revision: expectedRevision })
   if (error) databaseError(error)
   if (!data) throw new AppError(503, 'PERSISTENCE_FAILED', 'Restoration was not confirmed.')
@@ -85,6 +95,7 @@ export async function duplicateCV(cvId: string, userId: string, newTitle?: strin
 }
 
 export async function updateCVSharing(cvId: string, userId: string, isPublic: boolean) {
+  if (await usesLegacySchema()) return legacy.publishCV(cvId, userId, isPublic)
   const { data, error } = await requireDatabase().rpc('publish_cv', { p_cv_id: cvId, p_user_id: userId, p_is_public: isPublic, p_token: nanoid(32) })
   if (error) databaseError(error)
   return { shareToken: data as string | null }

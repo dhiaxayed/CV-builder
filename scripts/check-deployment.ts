@@ -4,11 +4,8 @@ import { verifyDatabaseReadiness } from './lib/database-readiness'
 config({ path: '.env.local', quiet: true })
 
 async function main() {
-  // Git pushes must not promote code that requires an older production schema.
-  // Local builds and isolated CI do not need hosted database credentials.
-  if (!process.env.VERCEL && !process.env.VERCEL_ENV) return
-  await verifyDatabaseReadiness(process.env)
-  console.log('[deployment] Required database columns and RPCs are available. No database changes were made.')
+  const result = await verifyDatabaseReadiness(process.env)
+  console.log(`[deployment] ${result.schema} database schema is reachable. No database changes were made.`)
 }
 
 main().catch(error => {

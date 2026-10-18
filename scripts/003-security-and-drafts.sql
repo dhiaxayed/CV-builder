@@ -10,6 +10,13 @@ ALTER TABLE public.cvs ADD COLUMN IF NOT EXISTS published_template_id text;
 ALTER TABLE public.cv_versions ADD COLUMN IF NOT EXISTS template_id text;
 
 -- Copy the latest working state once. Existing historical rows are preserved.
+-- Compatibility deployments keep their draft/public copies in reserved rows.
+UPDATE public.cvs c SET draft_data = v.data
+FROM public.cv_versions v WHERE v.cv_id = c.id AND v.version = 0 AND c.draft_data IS NULL;
+UPDATE public.cvs c SET published_data = v.data,
+  published_title = coalesce(v.data#>>'{_cvBuilder,title}', c.title),
+  published_template_id = coalesce(v.data#>>'{_cvBuilder,templateId}', c.template_id)
+FROM public.cv_versions v WHERE v.cv_id = c.id AND v.version = -1 AND c.is_public AND c.published_data IS NULL;
 UPDATE public.cvs c SET draft_data = CASE
   WHEN c.photo_url IS NOT NULL AND coalesce(v.data#>>'{basics,photoUrl}', '') = ''
     THEN jsonb_set(v.data, '{basics,photoUrl}', to_jsonb(c.photo_url), true)
@@ -17,7 +24,9 @@ UPDATE public.cvs c SET draft_data = CASE
 FROM public.cv_versions v WHERE v.id = c.current_version_id AND c.draft_data IS NULL;
 UPDATE public.cvs SET draft_data = '{"basics":{"name":"","title":"","contact":{"email":"","phone":"","location":""}},"summary":"","experience":[],"education":[],"projects":[],"skills":[],"certifications":[],"awards":[],"languages":[],"customSections":[]}'::jsonb WHERE draft_data IS NULL;
 ALTER TABLE public.cvs ALTER COLUMN draft_data SET NOT NULL;
-UPDATE public.cv_versions v SET template_id = c.template_id FROM public.cvs c WHERE c.id = v.cv_id AND v.template_id IS NULL;
+UPDATE public.cv_versions v SET template_id = coalesce(v.data#>>'{_cvBuilder,templateId}',
+  (SELECT d.data#>>'{_cvBuilder,originalTemplateId}' FROM public.cv_versions d WHERE d.cv_id=c.id AND d.version=0), c.template_id)
+FROM public.cvs c WHERE c.id = v.cv_id AND v.template_id IS NULL;
 UPDATE public.cvs SET published_data = draft_data, published_title = title, published_template_id = template_id WHERE is_public AND published_data IS NULL;
 
 -- Protect credentials at rest while keeping existing active links/sessions valid.

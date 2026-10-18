@@ -10,9 +10,9 @@ Node.js 22.x (au moins 22.16) et pnpm 10.13.1 sont requis. La version majeure No
 pnpm install --frozen-lockfile
 ```
 
-Copier `.env.example` vers `.env.local`, renseigner les variables existantes, puis lancer `pnpm dev`. La clé de service Supabase reste exclusivement côté serveur. Le mode email `console` affiche un lien de connexion dans l'interface de développement ; utiliser SMTP ou Resend en production.
+Copier `.env.example` vers `.env.local`, renseigner les variables existantes, puis lancer `pnpm dev`. Le déploiement d'origine avec `NEXT_PUBLIC_SUPABASE_URL` et `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY` est accepté. Une clé serveur configurée prend la priorité et reste exclusivement côté serveur. Le mode email `console` affiche un lien de connexion dans l'interface de développement ; utiliser SMTP ou Resend en production.
 
-Appliquer les migrations SQL dans l'ordre 001 → 002 → 003 → 004 sur une base de test avant tout déploiement. Lire [la procédure de migration et de reprise](docs/hardening-deployment.md) : les anciens binaires ne doivent plus écrire après la migration de sécurité.
+La base existante issue de 001/002 est reconnue automatiquement ; aucune nouvelle variable ni migration n'est imposée pour conserver ce déploiement. Les migrations 003/004 et leur clé serveur permettent d'opter pour le mode à permissions restreintes et opérations transactionnelles. Lire [la procédure de migration et de reprise](docs/hardening-deployment.md) avant de choisir ce mode : les anciens binaires ne doivent plus écrire après la migration de sécurité.
 
 ## Parcours et organisation
 
@@ -42,6 +42,7 @@ pnpm build
 pnpm check:bundles
 pnpm test:e2e
 pnpm test:production
+pnpm test:production:legacy
 pnpm audit --prod
 ```
 

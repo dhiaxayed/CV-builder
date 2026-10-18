@@ -1,6 +1,8 @@
 # Rapport d'ingénierie — CV Builder
 
-État de vérification : 17 octobre 2026. Travail effectué dans le dépôt local ; aucun déploiement ni migration de production exécutés. Vercel reste la cible de production.
+Rapport initial du 17 octobre 2026, complété le 18 octobre. Vercel reste la cible de production. Aucune migration de production n'a été exécutée depuis cette session.
+
+**État actuel demandé par le propriétaire : compatibilité avec le déploiement d'origine.** Le repli vers `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY` est restauré, et la compilation ne dépend plus d'un contrôle Supabase. La base distante a été reconnue en lecture seule comme un schéma d'origine : les requêtes demandaient zéro ligne. Le serveur s'adapte sans imposer de clé ni de migration supplémentaires. Les garanties de permissions/RPC décrites ci-dessous concernent le mode migré optionnel ; le mode compatible conserve les permissions existantes, des quotas locaux par instance et des opérations multi-requêtes plutôt que les transactions complètes du mode migré. Voir [VERCEL.md](../VERCEL.md).
 
 ## A. Synthèse
 
@@ -112,7 +114,7 @@ Vérification complémentaire du 18 octobre 2026 avec Node.js 22.23.3, télécha
 | --- | --- |
 | `pnpm typecheck` | Réussi |
 | `pnpm lint --max-warnings 0` | Réussi, aucune erreur ni warning |
-| `pnpm test` | 16 tests unitaires + 7 tests PostgreSQL réussis, dont les deux types de clés serveur et le contrôle de préparation du déploiement |
+| `pnpm test` | 17 tests unitaires + 8 tests PostgreSQL réussis, dont le repli public d'origine, les clés serveur et la migration optionnelle des données de compatibilité |
 | `pnpm test:pdf` avec Tectonic | 37/37 réussis : rendu, aperçus, overflow, images, palette, caractères et multipage |
 | `pnpm exec tsx --test tests/pdf/*.test.ts` avec `LATEX_RENDERER=system` | 37/37 réussis ; la comparaison raster des aperçus est réservée à Tectonic |
 | `pnpm exec tsx --test --test-name-pattern='published thumbnails' tests/pdf/render.test.ts` | Réussi après la régénération finale et la normalisation des fins de ligne Windows/Linux |
@@ -120,16 +122,18 @@ Vérification complémentaire du 18 octobre 2026 avec Node.js 22.23.3, télécha
 | `python scripts/check-pdf-layout.py output/pdf/system-templates` | Même contrôle géométrique réussi pour les 16 PDF système |
 | `pnpm pdf:prepare` | 96 compilations de préparation réussies : 16 modèles × 2 familles × 3 densités, avec photo |
 | `pnpm templates:generate` | 16 aperçus issus des PDF réels, texte vérifié et manifest régénéré |
-| `pnpm build` | Build optimisée Next.js 16.4.2 réussie |
+| `pnpm build` | Build optimisée Next.js 16.4.2 réussie, y compris avec `VERCEL=1`, `VERCEL_ENV=production` et la configuration publique existante sans clé serveur |
 | `pnpm check:bundles` | Deux fonctions vérifiées, environ 147,7 Mio de traces chacune ; workers présents, aucun PDF, dossier QA ou fichier `.env` embarqué |
-| `pnpm test:production` | 1/1 réussi avec chaque configuration serveur (ancienne et moderne) sur `next start` : cookie Secure/HttpOnly/SameSite, PDF natif, source cohérente et révocation |
-| `pnpm test:e2e` | 14/14 réussis : authentification, mobile, style, sauvegardes, versions, droits, photos et partage |
+| `pnpm test:production` | Parcours applicable réussi en mode clé serveur sur `next start` : cookie Secure/HttpOnly/SameSite, PDF natif, source cohérente et révocation |
+| `pnpm test:production:legacy` | 2/2 réussis sans migrations ni clé serveur : anciennes sessions/CV, sauvegarde, partage figé, historique/restauration et PDF natifs privés/publics |
+| `pnpm test:e2e` | 14/14 réussis en mode migré et 14/14 en mode d'origine avec uniquement une clé publique : authentification, mobile, style, sauvegardes, versions, droits applicatifs, photos et partage |
 | `pnpm test:ai:live` | 3 actions OpenRouter réelles, contrats validés et réécritures factuelles filtrées |
 | `pnpm test:e2e:ai:live` | 1/1 réussi avec le fournisseur réel : analyse, condensation, application/sauvegarde/annulation et adaptation Pro |
 | `pnpm audit --prod --json` | 0 vulnérabilité connue dans les dépendances de production |
 | `git -c core.safecrlf=false diff --check` | Réussi |
 | Scan des secrets disponibles dans les 21 chunks client | Aucune valeur OpenRouter/SMTP trouvée ; aucun secret affiché pendant le contrôle |
 | `pnpm db:check:public` | Non concluant, code de sortie 1 ; voir D. Aucun enregistrement privé récupéré |
+| `pnpm db:check` après retour de compatibilité | Réussi avec l'environnement existant, ancien schéma détecté par requêtes à zéro ligne ; aucune migration appliquée |
 | Vérification SMTP via `transporter.verify()` | Connexion et authentification réussies au second essai après un `EDNS` transitoire ; aucun message envoyé |
 
 Le contrôle SMTP vérifie connexion et authentification sans envoyer de message ; il ne prouve pas la délivrabilité ou l'acceptation d'une adresse d'expéditeur. [Documentation Nodemailer](https://nodemailer.com/smtp#verifying-the-configuration).
@@ -139,6 +143,8 @@ Les échecs intermédiaires n'ont pas été masqués : syntaxe IA initiale, work
 ## H. Limites et contrôles externes restants
 
 Avant le push de livraison, ajout d'un contrôle Vercel en lecture seule : colonnes requises et présence des huit RPC via les métadonnées PostgREST. Il bloque la build si les migrations ou l'accès serveur manquent, sans exécuter de SQL ni récupérer de CV. La version actuellement publiée n'est ainsi pas remplacée par cette build incomplète. Ce contrôle ne remplace pas la vérification SQL des permissions ni la recette hébergée.
+
+Ce contrôle automatique a ensuite été retiré à la demande du propriétaire pour rétablir le déploiement d'origine. Il reste disponible comme diagnostic manuel compatible avec les deux schémas. Les mentions précédentes d'une clé serveur obligatoire et d'un blocage de build décrivent l'étape de durcissement antérieure, pas le comportement actuel.
 
 Le journal Vercel fourni après ce push confirme l'installation de Tectonic 0.16.9, puis un arrêt sur l'absence d'URL ou de clé serveur dans l'environnement de build. Le diagnostic distingue désormais ces variables. Le serveur et les contrôles acceptent `SUPABASE_SECRET_KEY` (clé moderne, prioritaire) et `SUPABASE_SERVICE_ROLE_KEY` (ancienne clé), sans repli sur une clé publique. Les requêtes manuelles de préparation transmettent une clé moderne uniquement via `apikey`. La session ne dispose ni de la clé serveur locale ni d'un accès aux paramètres Vercel : leur configuration effective reste une action du propriétaire du compte.
 

@@ -1,8 +1,10 @@
 # Security and persistence rollout
 
-This application uses custom passwordless sessions. It does not use Supabase Auth JWTs. All private database access runs on the server with `SUPABASE_SECRET_KEY` (modern) or `SUPABASE_SERVICE_ROLE_KEY` (legacy); the modern key takes precedence when both are configured. Browser roles have no table or application RPC access. Ownership is checked in each private query and transactional function. A publishable/anonymous key cannot replace the server credential.
+This guide describes the optional migrated schema. Existing deployments can keep the original 001/002 schema and public key; the server detects that schema automatically. No migration runs during installation, build or application startup. See [VERCEL.md](../VERCEL.md) for compatibility behavior and its limits.
 
-## Before deployment
+The application uses custom passwordless sessions, not Supabase Auth JWTs. In the migrated mode, private database access uses `SUPABASE_SECRET_KEY` (modern) or `SUPABASE_SERVICE_ROLE_KEY` (legacy); the modern key takes precedence. Browser roles have no table or application RPC access after migration 003. Ownership is checked in private queries in both modes. A publishable key cannot bypass the restricted grants of an already-migrated database.
+
+## Before opting into the migrated schema
 
 1. Back up the database. Use an isolated staging project first.
 2. For a new database, apply `scripts/001-create-tables.sql`, then `002-add-plan-tier.sql`.
@@ -12,7 +14,7 @@ This application uses custom passwordless sessions. It does not use Supabase Aut
 6. Coordinate migration and application rollout in a maintenance window. **The old application must not write after migration:** it updates historical versions and stores unhashed tokens. Do not roll back just the application binary.
 7. Validate the flows below in staging before production rollout.
 
-The Vercel build checks required schema columns and RPC metadata before compiling. A push to the production branch can therefore be reviewed on GitHub without replacing the current deployment when migrations or server credentials are missing. Apply SQL only through the coordinated procedure above, then redeploy. PostgREST OpenAPI metadata must be enabled for this read-only check; it performs only GET requests with zero-row table queries and never invokes an RPC. Passing the check does not certify RLS or complete the hosted smoke tests.
+The build compiles the application and LaTeX resources without querying the database. `pnpm db:check` and `pnpm db:check:deployment` are optional read-only diagnostics, supporting the original schema as well as required migrated columns/RPC metadata. Apply SQL only through the coordinated procedure above, then redeploy. Passing a zero-row diagnostic does not certify RLS or complete the hosted smoke tests.
 
 Migration 003 hashes existing tokens in place. Existing links and sessions remain usable through the new hashing code. Existing authorized Pro accounts are preserved, including the previous server-controlled `preferences.tier` representation. Contacting the Pro email never changes a plan.
 
