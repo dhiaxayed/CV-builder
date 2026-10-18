@@ -235,7 +235,7 @@ CREATE INDEX IF NOT EXISTS idx_uploaded_files_user_id ON uploaded_files(user_id)
 -- DEFAULT DATA
 -- ============================================
 
--- Insert default templates (all 16 templates)
+-- Insert default templates (all 24 templates)
 INSERT INTO templates (id, name, description, category, is_default, sort_order, latex_template) VALUES
 -- ATS-Friendly
 ('modern', 'Modern', 'Clean ATS-friendly design with great readability.', 'ats', FALSE, 1, 'modern'),
@@ -256,7 +256,15 @@ INSERT INTO templates (id, name, description, category, is_default, sort_order, 
 ('tech', 'Tech', 'Developer-focused design optimized for technical roles.', 'tech', FALSE, 13, 'tech'),
 ('academic', 'Academic', 'Perfect for researchers, professors, and scientists.', 'academic', FALSE, 14, 'academic'),
 ('casual', 'Casual', 'Friendly approachable design for modern companies.', 'tech', FALSE, 15, 'casual'),
-('vintage', 'Vintage', 'Traditional elegant design with classic typography.', 'classic', FALSE, 16, 'vintage')
+('vintage', 'Vintage', 'Traditional elegant design with classic typography.', 'classic', FALSE, 16, 'vintage'),
+('timeline','Timeline','Chronological career history with a separate date rail.','ats',FALSE,17,'timeline'),
+('editorial','Editorial','Editorial typography with a right-hand information rail.','creative',FALSE,18,'editorial'),
+('consultant','Consultant','Business narrative with outer-margin section labels.','business',FALSE,19,'consultant'),
+('architect','Architect','Portfolio-first composition with a dark identity panel.','creative',FALSE,20,'architect'),
+('scholar','Scholar','Research profile with education in a side rail.','academic',FALSE,21,'scholar'),
+('graduate','Graduate','Education and projects first for early careers.','ats',FALSE,22,'graduate'),
+('legal','Legal','Formal serif layout with a restrained contact ledger.','business',FALSE,23,'legal'),
+('product','Product','Project-led narrative with a competency sidebar.','tech',FALSE,24,'product')
 ON CONFLICT (id) DO UPDATE SET
   name = EXCLUDED.name,
   description = EXCLUDED.description,

@@ -12,7 +12,6 @@ import { AppearanceSettings } from '@/components/cv-editor/appearance-settings'
 import { generateLatex, type RenderDensity } from '@/lib/latex/generator'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Select,
@@ -97,6 +96,11 @@ export default function CVEditorPage() {
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null)
   const [isPdfPreviewLoading, setIsPdfPreviewLoading] = useState(false)
   const [pdfPreviewError, setPdfPreviewError] = useState<string | null>(null)
+  const [pageMode, setPageMode] = useState<'one-page' | 'multi-page'>('one-page')
+  const [pdfErrorCode, setPdfErrorCode] = useState<string | null>(null)
+  const [previewAttempt, setPreviewAttempt] = useState(0)
+  const [pdfPages, setPdfPages] = useState<number | null>(null)
+  const [isExporting, setIsExporting] = useState(false)
   const saverRef = useRef<RevisionSaver<{ data: CVData; templateId: string; title: string }> | null>(null)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved')
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -176,6 +180,7 @@ export default function CVEditorPage() {
     const controller = new AbortController()
     setPdfPreviewUrl(null)
     setPdfPreviewError(null)
+    setPdfErrorCode(null)
     setIsPdfPreviewLoading(true)
     const timeout = window.setTimeout(async () => {
       setIsPdfPreviewLoading(true)
@@ -193,12 +198,14 @@ export default function CVEditorPage() {
             title: cv.title,
             format: 'pdf',
             intent: 'preview',
+            pageMode,
           }),
         })
 
         if (!response.ok) {
           const error = await response.json().catch(() => ({}))
-          throw new Error(error.message || 'Failed to compile LaTeX PDF preview')
+          setPdfErrorCode(error.code || null)
+          throw new Error(error.message || error.error || 'The PDF service could not complete this request. Retry in a moment.')
         }
 
         const blob = await response.blob()
@@ -211,6 +218,7 @@ export default function CVEditorPage() {
 
         pdfPreviewUrlRef.current = nextUrl
         setPdfPreviewUrl(nextUrl)
+        setPdfPages(Number(response.headers.get('X-CV-PDF-Pages')) || null)
         const density = response.headers.get('X-CV-PDF-Density')
         if (density === 'normal' || density === 'compact' || density === 'dense') setCompiledLayout({ data:cvData,template:cv.template_id,density })
       } catch (error) {
@@ -227,7 +235,7 @@ export default function CVEditorPage() {
       window.clearTimeout(timeout)
       controller.abort()
     }
-  }, [rightPanel, cvData, cv])
+  }, [rightPanel, cvData, cv, pageMode, previewAttempt])
 
   // All content and template changes enter one queue, including photo and AI edits.
   useEffect(() => {
@@ -501,6 +509,8 @@ export default function CVEditorPage() {
 
   // Export to PDF (template-accurate LaTeX compilation)
   const handleExportPDF = async () => {
+    if (isExporting) return
+    setIsExporting(true)
     try {
       if (!cvData) {
         throw new Error('CV data is not loaded yet')
@@ -524,12 +534,13 @@ export default function CVEditorPage() {
           templateId: snapshot?.templateId || cv?.template_id,
           title: cv?.title,
           format: 'pdf',
+          pageMode,
         }),
       })
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({}))
-        throw new Error(error.message || 'Failed to generate PDF')
+        throw new Error(error.message || error.error || 'The PDF service could not complete this request. Retry in a moment.')
       }
 
       const blob = await response.blob()
@@ -549,6 +560,8 @@ export default function CVEditorPage() {
         title: error instanceof Error ? error.message : 'Failed to generate PDF',
         variant: 'destructive'
       })
+    } finally {
+      setIsExporting(false)
     }
   }
 
@@ -576,9 +589,9 @@ export default function CVEditorPage() {
   if (!cv || !cvData) return null
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="h-dvh min-h-0 overflow-hidden bg-background flex flex-col">
       {/* Header */}
-      <header className="border-b bg-card sticky top-0 z-20">
+      <header className="shrink-0 border-b bg-card z-20">
         <div className="container mx-auto px-4 py-2 flex flex-wrap gap-3 items-center justify-between">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" aria-label="Back to dashboard" onClick={() => navigateSaved('/dashboard')}>
@@ -589,7 +602,7 @@ export default function CVEditorPage() {
                 <FileText className="h-5 w-5 text-primary" />
                 <Input aria-label="CV title" className="h-8 max-w-56 font-semibold" maxLength={255} value={cv.title} onChange={event => setCv(current => current ? { ...current, title: event.target.value } : current)} />
               </div>
-              <p className="hidden sm:block text-xs text-muted-foreground">
+              <p className="hidden xl:block text-xs text-muted-foreground">
                 Use Preview to inspect layout, then open AI Assist for review, tailoring, and factual rewrites.
               </p>
             </div>
@@ -598,7 +611,7 @@ export default function CVEditorPage() {
           <div className="flex flex-wrap items-center gap-2">
             <Select value={cv.template_id} onValueChange={handleTemplateChange}>
               <SelectTrigger aria-label="CV template" className="w-40 h-8">
-                <SelectValue placeholder="Template" />
+                <SelectValue placeholder="Template">{TEMPLATES.find(template => template.id === cv.template_id)?.name}</SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {TEMPLATES.map(t => (
@@ -642,15 +655,15 @@ export default function CVEditorPage() {
               .tex
             </Button>
 
-            <Button size="sm" onClick={handleExportPDF}>
-              <Download className="h-4 w-4 mr-1" />
-              PDF
+            <Button size="sm" onClick={handleExportPDF} disabled={isExporting}>
+              {isExporting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />}
+              {isExporting ? 'Exporting...' : 'PDF'}
             </Button>
           </div>
         </div>
       </header>
 
-      <div className="border-b bg-muted/20">
+      <div className="shrink-0 border-b bg-muted/20">
         <div className="container mx-auto flex flex-wrap items-center gap-2 px-4 py-2 text-xs">
           <span role="status" aria-live="polite" className={`rounded-full border px-2 py-1 font-medium ${saveStatusTone}`}>
             {saveStatusLabel}
@@ -668,22 +681,22 @@ export default function CVEditorPage() {
               {lastVersionSavedLabel}
             </span>
           )}
-          <span className="text-muted-foreground">{TEMPLATES.find(template => template.id === cv.template_id)?.atsNote}</span>
-          <span className="text-muted-foreground">
+          <span className="hidden lg:inline text-muted-foreground">{TEMPLATES.find(template => template.id === cv.template_id)?.atsNote}</span>
+          <span className="hidden xl:inline text-muted-foreground">
             Tip: save a version after major AI changes so you can compare role-specific variants later.
           </span>
         </div>
       </div>
 
-      <div className="flex gap-2 border-b p-2 lg:hidden" role="group" aria-label="Editor panels">
+      <div className="flex shrink-0 gap-2 border-b p-2 lg:hidden" role="group" aria-label="Editor panels">
         <Button variant={mobilePane === 'edit' ? 'default' : 'outline'} size="sm" aria-pressed={mobilePane === 'edit'} onClick={() => setMobilePane('edit')}>Edit CV</Button>
         <Button variant={mobilePane === 'tools' ? 'default' : 'outline'} size="sm" aria-pressed={mobilePane === 'tools'} onClick={() => setMobilePane('tools')}>Preview &amp; AI</Button>
       </div>
       {/* Main Content */}
-      <div className="flex flex-col lg:flex-row h-[calc(100dvh-240px)] min-h-[400px] lg:h-[calc(100dvh-170px)] overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
         {/* Left Panel - Editor */}
         <div className={`w-full lg:w-1/2 lg:border-r min-h-0 flex-1 lg:flex-none flex-col ${mobilePane === 'edit' ? 'flex' : 'hidden lg:flex'}`}>
-          <div className="border-b px-4 py-2 flex items-center justify-between bg-muted/30">
+          <div className="shrink-0 border-b px-4 py-2 flex items-center justify-between bg-muted/30">
             <Tabs value={activeView} onValueChange={(v) => setActiveView(v as 'form' | 'latex')}>
               <TabsList className="h-8">
                 <TabsTrigger value="form" className="text-xs h-7">
@@ -698,7 +711,8 @@ export default function CVEditorPage() {
             </Tabs>
           </div>
 
-          <ScrollArea className="flex-1">
+          {/* A bounded native scroller supports wheel, touch and keyboard scrolling. */}
+          <div role="region" aria-label="CV form" tabIndex={0} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
             {activeView === 'form' ? (
               <div className="p-4 space-y-4">
                 <SectionBasics
@@ -748,7 +762,7 @@ export default function CVEditorPage() {
                 </p>
               </div>
             )}
-          </ScrollArea>
+          </div>
         </div>
 
         {/* Right Panel - Preview / ATS / JD Match */}
@@ -776,14 +790,21 @@ export default function CVEditorPage() {
             </Tabs>
           </div>
 
-          <div className="flex-1 min-h-0 p-2 sm:p-4 overflow-hidden">
+          <div className={`flex-1 min-h-0 p-2 sm:p-4 ${rightPanel === 'preview' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
             {rightPanel === 'preview' && (
               <div className="flex h-full flex-col overflow-hidden rounded-lg border bg-muted/20">
-                <div className="flex items-center justify-between border-b bg-background px-3 py-2">
+                <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b bg-background px-3 py-2">
                   <div className="min-w-0">
                     <p className="text-sm font-medium">Compiled LaTeX PDF</p>
-                    <p className="truncate text-xs text-muted-foreground">Renderer: LaTeX</p>
+                    <p className="truncate text-xs text-muted-foreground">{pdfPages ? `${pdfPages} ${pdfPages === 1 ? 'page' : 'pages'} · ` : ''}LaTeX PDF</p>
                   </div>
+                  <Select value={pageMode} onValueChange={value => setPageMode(value as typeof pageMode)}>
+                    <SelectTrigger aria-label="PDF page mode" className="h-8 w-40"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="one-page">One page</SelectItem>
+                      <SelectItem value="multi-page">Multiple pages</SelectItem>
+                    </SelectContent>
+                  </Select>
                   {isPdfPreviewLoading && (
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -793,9 +814,12 @@ export default function CVEditorPage() {
                 </div>
 
                 {pdfPreviewError ? (
-                  <div className="m-4 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-                    <p className="font-medium">LaTeX compilation failed</p>
+                  <div role="alert" className="m-4 overflow-y-auto rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+                    <p className="font-medium">{pdfErrorCode === 'PDF_OVERFLOW' ? 'Your CV needs more space' : 'PDF preview unavailable'}</p>
                     <p className="mt-2 whitespace-pre-wrap text-xs">{pdfPreviewError}</p>
+                    <Button variant="outline" size="sm" className="mt-3" onClick={() => pdfErrorCode === 'PDF_OVERFLOW' ? setPageMode('multi-page') : setPreviewAttempt(value => value + 1)}>
+                      {pdfErrorCode === 'PDF_OVERFLOW' ? 'Allow multiple pages' : 'Retry preview'}
+                    </Button>
                   </div>
                 ) : pdfPreviewUrl ? (
                   <iframe

@@ -22,7 +22,7 @@ for (const id of TEMPLATE_IDS) {
     const parser = new PDFParse({ data:new Uint8Array(result.bytes) })
     try {
       const text = (await parser.getText()).text
-      for (const required of ['José','François','TechCorp','StartupXYZ','Education','Skills','Projects','Certifications','Awards','Languages','Community','coding club']) assert.ok(text.includes(required),`${id}: ${required}`)
+      for (const required of ['José','François','TechCorp','StartupXYZ','Education','Skills','Projects','Certifications','Awards','Languages','Community','coding club']) assert.ok(text.toLowerCase().includes(required.toLowerCase()),`${id}: ${required}`)
       const info = await parser.getInfo({ parsePageInfo:true })
       assert.ok(info.pages.some(page => page.links.length > 0),'Links must be clickable')
       // Gallery artifacts represent production Tectonic, while this suite also
@@ -87,12 +87,23 @@ test('overflow is explicit and multi-page output preserves the last entry', { ti
   const parser = new PDFParse({ data:new Uint8Array(result.bytes) })
   try { assert.ok((await parser.getText()).text.includes('Company 19')) } finally { await parser.destroy() }
 })
+for (const id of ['creative','architect','editorial','executive','timeline']) {
+  test(`${id}: long multi-page output preserves the last entry and all sections`,{ timeout:180000 },async () => {
+    const result=await renderCV(overflowFixture(),id,'multi-page')
+    assert.ok(result.pages>1)
+    const parser=new PDFParse({ data:new Uint8Array(result.bytes) })
+    try {
+      const text=(await parser.getText()).text.toLowerCase()
+      for (const required of ['Company 19','Education','Skills','Projects','Certifications','Awards','Languages','Community','coding club']) assert.ok(text.includes(required.toLowerCase()),`${id}: missing ${required}`)
+    } finally { await parser.destroy() }
+  })
+}
 test('published thumbnails are tied to the current renderer and fixture',async () => {
   const source = createHash('sha256')
   for (const file of ['lib/latex/generator.ts','tests/fixtures/render.ts','lib/templates.ts','lib/types/cv.ts','lib/pdf/render.ts','lib/pdf/compiler.ts','scripts/install-tectonic-runtime-libs.mjs']) source.update((await readFile(file,'utf8')).replace(/\r\n/g,'\n'))
   const hash = source.digest('hex')
   const manifest = JSON.parse(await readFile('public/templates/manifest.json','utf8'))
   assert.equal(manifest.sourceHash,hash,'Regenerate thumbnails after changing the renderer, template catalogue or fixture')
-  assert.equal(manifest.templates.length,16)
+  assert.equal(manifest.templates.length,TEMPLATE_IDS.length)
   assert.equal(manifest.renderer,'tectonic')
 })

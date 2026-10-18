@@ -32,6 +32,7 @@ class AIJsonParseError extends Error {
 export type AIProvider = 'groq' | 'openrouter'
 
 export class AIProviderError extends Error {}
+export const DEFAULT_GROQ_MODEL = 'openai/gpt-oss-120b'
 
 export function aiFailureReason(error: unknown): string {
   return error instanceof AIProviderError ? error.message : 'The AI response could not be validated. Local checks are available; retry later.'
@@ -52,7 +53,7 @@ function providerConfiguration() {
     provider,
     endpoint: groq ? 'https://api.groq.com/openai/v1/chat/completions' : 'https://openrouter.ai/api/v1/chat/completions',
     apiKey: groq ? process.env.GROQ_API_KEY! : process.env.OPENROUTER_API_KEY!,
-    model: groq ? process.env.GROQ_MODEL || 'llama-3.3-70b-versatile' : process.env.OPENROUTER_MODEL || 'openrouter/free',
+    model: groq ? process.env.GROQ_MODEL?.trim() || DEFAULT_GROQ_MODEL : process.env.OPENROUTER_MODEL?.trim() || 'openrouter/free',
     timeout: Number.isFinite(configuredTimeout) && configuredTimeout > 0 ? Math.min(30000, Math.max(1000, configuredTimeout)) : groq ? 10000 : 25000,
   }
 }
@@ -65,12 +66,24 @@ async function postCompletion(body: Record<string, unknown>, deadline: number, c
     const timer = setTimeout(() => controller.abort(), Math.min(config.timeout, remaining))
     try {
       const response = await fetch(config.endpoint, {
-        method: 'POST', headers: { Authorization: `Bearer ${config.apiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+        method: 'POST', headers: { Authorization: `Bearer ${config.apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...body,model:config.model,
+          ...(config.provider === 'groq' && config.model.startsWith('openai/gpt-oss-') ? { reasoning_effort:'low',include_reasoning:false } : {}),
+        }),
         cache: 'no-store', signal: controller.signal,
       })
       // The timeout covers reading the response body as well as receiving headers.
       const responseText = await response.text()
       if (!response.ok) {
+        const modelRetired = response.status === 400 && parseCompletionResponse(responseText).error?.code === 'model_decommissioned'
+        if (attempt === 0 && config.provider === 'groq' && config.model !== DEFAULT_GROQ_MODEL && (response.status === 404 || modelRetired)) {
+          // Groq retired several previously configured models in 2026. Preserve
+          // working overrides, and recover from an unavailable model once using
+          // Groq's documented production replacement, on the same credentials.
+          config.model = DEFAULT_GROQ_MODEL
+          console.warn('[AI] Configured Groq model unavailable; retrying its supported production replacement.')
+          continue
+        }
         if (attempt === 0 && (response.status === 429 || response.status >= 500)) {
           const retryAfter=Number(response.headers.get('retry-after'))
           const delay=retryAfter > 0 ? Math.min(2000,retryAfter*1000) : 350
@@ -225,7 +238,7 @@ export async function probeAI() {
   const result = await generateStructuredObject({
     schema: z.object({ ok:z.literal(true) }),
     temperature: 0,
-    maxCompletionTokens: 80,
+    maxCompletionTokens: 256,
     shapeInstructions: '{"ok":true}',
     messages: [{ role:'system',content:'Return the requested JSON exactly.' }, { role:'user',content:'Confirm chat completion availability.' }],
   })

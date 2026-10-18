@@ -1,5 +1,5 @@
 {
-  "sourceHash": "06102348a5ba00ec1313c5d9216b05f1eda75d7822eb53711a5142951e03575e",
+  "sourceHash": "5a974211233dc44254d976c9ca16271d162e7c0d2c497580c4357747841a0215",
   "renderer": "tectonic",
   "templates": [
     {
@@ -8,7 +8,7 @@
       "density": "compact",
       "extractableText": true,
       "preview": "actual PDF first page",
-      "renderHash": "cb3c771b9ca71d6113468206e62d56854e81762839eb5d688404c6ee30264cbb"
+      "renderHash": "43edcddabbc34d82f2dced8313b84cec923d3e07544738d6ed00ede2241fbb2a"
     },
     {
       "template": "classic",
@@ -16,7 +16,7 @@
       "density": "compact",
       "extractableText": true,
       "preview": "actual PDF first page",
-      "renderHash": "349b53606b71f2123d27364ec4a2240d0033efd98f56be92defd8ee0e9415d22"
+      "renderHash": "6be9a67579fb4695fff866580fdd38b9dee00a3411335a241a5be9c08aefca31"
     },
     {
       "template": "minimal",
@@ -24,7 +24,7 @@
       "density": "dense",
       "extractableText": true,
       "preview": "actual PDF first page",
-      "renderHash": "1beb5349a348062135314996e68477fa52d3683c224d784822aff1e5db4f47c4"
+      "renderHash": "c99998ea6b2f0c4fe66ba9b65f18db3e0c74763c5290931d8caf75f5889ee348"
     },
     {
       "template": "compact",
@@ -32,7 +32,7 @@
       "density": "normal",
       "extractableText": true,
       "preview": "actual PDF first page",
-      "renderHash": "4fed79fa1ddfce9136bb52b6f3f6b8aea2fd7a4a44936453a023c3bc631cf75a"
+      "renderHash": "f4bc76537217cf3324a5f00f99a8d85498360e188a74fbbb6b553246f8a50788"
     },
     {
       "template": "professional",
@@ -40,7 +40,7 @@
       "density": "dense",
       "extractableText": true,
       "preview": "actual PDF first page",
-      "renderHash": "944e512cc655cfbb0595ba3ebafb3f9e3ff1d384bccefc4ca8ff681f0cdd391c"
+      "renderHash": "43b7fdeeba47ccc54aee2c6abbb4855ee5cd5e630906420e9ea63f6659036a13"
     },
     {
       "template": "executive",
@@ -48,15 +48,15 @@
       "density": "dense",
       "extractableText": true,
       "preview": "actual PDF first page",
-      "renderHash": "8afc115f24c6cadf95420377bf356c485f18bda0934ec5678762e50df905ec2f"
+      "renderHash": "1e907fc0efabfbb09d7b8c6ba62255c60edfa7a25387428331e5e5e7151abc58"
     },
     {
       "template": "banking",
       "pages": 1,
-      "density": "compact",
+      "density": "dense",
       "extractableText": true,
       "preview": "actual PDF first page",
-      "renderHash": "aeb6aba950871feeeaddee57f591a617c924e8ca9343f324e2924590e1c59b2a"
+      "renderHash": "eef26616b3b2064a7b04d5b080345bbbeb2c3f50a3795387e5fe95f44698925f"
     },
     {
       "template": "elegant",
@@ -64,15 +64,15 @@
       "density": "normal",
       "extractableText": true,
       "preview": "actual PDF first page",
-      "renderHash": "76acb1c9800827ad106e7da2f0acc849a213842bcfa9f78c0411c0576920be1a"
+      "renderHash": "6d6166319812cead75f9e2cf2df69f32858adbcf63aa02c7c3feb1b721d83bdb"
     },
     {
       "template": "creative",
       "pages": 1,
-      "density": "compact",
+      "density": "normal",
       "extractableText": true,
       "preview": "actual PDF first page",
-      "renderHash": "221efd4332d9c3fa363cbfb1dd03a77ed4b556bc3fc6dbc5c907d5a86e71fad7"
+      "renderHash": "842dfa714fe2a008a327505f808c012315cfa1f186919ba04dafe249e814618a"
     },
     {
       "template": "fancy",
@@ -80,15 +80,15 @@
       "density": "compact",
       "extractableText": true,
       "preview": "actual PDF first page",
-      "renderHash": "2c7ee0d797eb1feecdea27f0d882a06215e057a31bf687be69d9a3627a9de390"
+      "renderHash": "586a03af026bc8071a00db91fe7aaa61d5d1c685beb34362de67e75fe9022bc2"
     },
     {
       "template": "bold",
       "pages": 1,
-      "density": "compact",
+      "density": "dense",
       "extractableText": true,
       "preview": "actual PDF first page",
-      "renderHash": "95d79d605b361ecc8383a9acdb93bde23132c5fde9c939c702fb1099471d2bc8"
+      "renderHash": "e6d65b3c2be22727684514903a2502c287dc22d50f27e692fceb69dd994e1420"
     },
     {
       "template": "infographic",
@@ -96,7 +96,7 @@
       "density": "normal",
       "extractableText": true,
       "preview": "actual PDF first page",
-      "renderHash": "b41a0189d9d3e2884bf0fcdd03784f0d8850ad6acba0e8d05512e32fd85cde70"
+      "renderHash": "7b713d82a422214658ec6abb02be26742758bf6804ac6e8b47afbbeb685c2dc3"
     },
     {
       "template": "tech",
@@ -104,31 +104,95 @@
       "density": "normal",
       "extractableText": true,
       "preview": "actual PDF first page",
-      "renderHash": "5f3a8373aa9f9c04771f8ebe16fe5cc422477a24d7f4c91f62de42bfcb5f5902"
+      "renderHash": "73bd29753fe9830fe3240ce6783bf2b6d8cce495b0db510e5bda658cef08994f"
     },
     {
       "template": "academic",
       "pages": 1,
-      "density": "dense",
+      "density": "compact",
       "extractableText": true,
       "preview": "actual PDF first page",
-      "renderHash": "fc082bd4d3bb0116f8a8d49c533cdc5a3548b4c502d24ab0298adaedc89b9748"
+      "renderHash": "be1d487799522b559b48c3218736818c2af9a707dc1bff49a189667f10e53511"
     },
     {
       "template": "casual",
       "pages": 1,
-      "density": "dense",
+      "density": "compact",
       "extractableText": true,
       "preview": "actual PDF first page",
-      "renderHash": "f4040b890e7ef67c55b567b9886793ab52d456ad9a2386294907761097d87d98"
+      "renderHash": "705ae66d625d7b805667c86c7bcf27141bb9206099ff04f49d6c65a73f8f7dfd"
     },
     {
       "template": "vintage",
       "pages": 1,
+      "density": "normal",
+      "extractableText": true,
+      "preview": "actual PDF first page",
+      "renderHash": "4e9755d7a72ddc8e99960912a5a73a90f22a98e5469bfb5728fd66fae14564b7"
+    },
+    {
+      "template": "timeline",
+      "pages": 1,
+      "density": "compact",
+      "extractableText": true,
+      "preview": "actual PDF first page",
+      "renderHash": "f3048419324bf8753b0df74ae731c6e70227f0fcbacaede04f4552b82a84c9ae"
+    },
+    {
+      "template": "editorial",
+      "pages": 1,
+      "density": "normal",
+      "extractableText": true,
+      "preview": "actual PDF first page",
+      "renderHash": "dfc8f9aea8cc204ab32b7a571c97c059e6567406f7320e7af90cec86190b6dab"
+    },
+    {
+      "template": "consultant",
+      "pages": 1,
       "density": "dense",
       "extractableText": true,
       "preview": "actual PDF first page",
-      "renderHash": "61e594eb2b8639e7ee14661550dd2ee73c6dbeca219cbf1a5537c1269894ce23"
+      "renderHash": "8606f6c9715cced710f072cec0fbfba0af77fe1095641918b747d771aa0cbc14"
+    },
+    {
+      "template": "architect",
+      "pages": 1,
+      "density": "normal",
+      "extractableText": true,
+      "preview": "actual PDF first page",
+      "renderHash": "512c3b698d518ec0e9dd04a20e3692058d0e0ac09d0545561b1549803392794e"
+    },
+    {
+      "template": "scholar",
+      "pages": 1,
+      "density": "normal",
+      "extractableText": true,
+      "preview": "actual PDF first page",
+      "renderHash": "8bcfce15b35c65cc8201de040ebf3c1c89ec9c650e924e1b7fe6226592734302"
+    },
+    {
+      "template": "graduate",
+      "pages": 1,
+      "density": "compact",
+      "extractableText": true,
+      "preview": "actual PDF first page",
+      "renderHash": "cb0b5b603b15a351b78b989cbbd251d16da206e245dd75d6d7d6209cbd16db71"
+    },
+    {
+      "template": "legal",
+      "pages": 1,
+      "density": "dense",
+      "extractableText": true,
+      "preview": "actual PDF first page",
+      "renderHash": "e9d344e78fc7f1ca00bd0f8c59f0a308f496252c010586c33bcf2dc5c3ab9685"
+    },
+    {
+      "template": "product",
+      "pages": 1,
+      "density": "normal",
+      "extractableText": true,
+      "preview": "actual PDF first page",
+      "renderHash": "6e75636f1cf918384336c264c5b1d5e7792bcf39680769bfbff47213ebd42897"
     }
   ]
 }

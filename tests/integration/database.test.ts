@@ -2,6 +2,7 @@ import { after, before, test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createTestDatabase } from '../helpers/database'
 import { createSampleCVData } from '../../lib/types/cv'
+import { TEMPLATE_IDS } from '../../lib/templates'
 
 let db: Awaited<ReturnType<typeof createTestDatabase>>
 const fixture = createSampleCVData()
@@ -43,6 +44,16 @@ test('free creation is atomic and concurrent requests cannot exceed one CV', asy
   await assert.rejects(call('create_cv_atomic', ['b','Invalid','nonexistent',fixture]), /foreign key/)
   const partial = await db.query("SELECT * FROM cvs WHERE title='Invalid'")
   assert.equal(partial.rows.length, 0)
+})
+
+test('every advertised template can be persisted through the existing foreign key',async () => {
+  const catalogue = await db.query<{ id:string }>('SELECT id FROM templates')
+  assert.deepEqual(catalogue.rows.map(row=>row.id).sort(),[...TEMPLATE_IDS].sort())
+  for (const template of ['timeline','editorial','consultant','architect','scholar','graduate','legal','product']) {
+    const cv = await call<{ id:string; template_id:string }>('create_cv_atomic',['a','Catalogue verification',template,fixture])
+    assert.equal(cv.template_id,template)
+    await db.query('DELETE FROM cvs WHERE id=$1',[cv.id])
+  }
 })
 
 test('V1/V2/V3 survive restore, edits, and V4; optimistic saves reject stale revisions', async () => {

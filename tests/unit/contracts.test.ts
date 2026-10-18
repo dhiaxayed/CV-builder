@@ -33,8 +33,8 @@ test('every template resolves, escapes hostile TeX once, and renders supported f
   for (const id of TEMPLATE_IDS) {
     assert.equal(resolveTemplateId(id),id)
     const source = generateLatex(createSampleCVData(),id)
-    assert.ok(source.includes(`template=${id}`)); assert.ok(source.includes('Awards \\& Honors'))
-    assert.ok(source.includes('Languages')); assert.ok(source.includes('Employee of the Year'))
+    assert.ok(source.includes(`template=${id}`)); assert.match(source,/Awards \\\& Honors/i)
+    assert.match(source,/Languages/i); assert.ok(source.includes('Employee of the Year'))
   }
   assert.equal(resolveTemplateId('classic-ats'),'classic')
   assert.equal(resolveTemplateId('invalid'),'modern')
@@ -153,5 +153,31 @@ test('existing OpenRouter configuration uses the same validated contract and Gro
     globalThis.fetch=originalFetch
     if (groq===undefined) delete process.env.GROQ_API_KEY; else process.env.GROQ_API_KEY=groq
     if (router===undefined) delete process.env.OPENROUTER_API_KEY; else process.env.OPENROUTER_API_KEY=router
+  }
+})
+
+test('Groq recovers once from retired models while preserving working overrides and authentication failures',async () => {
+  const originalFetch=globalThis.fetch,oldKey=process.env.GROQ_API_KEY,oldModel=process.env.GROQ_MODEL
+  process.env.GROQ_API_KEY='test-groq-key';process.env.GROQ_MODEL='retired-model'
+  const models:string[]=[]
+  globalThis.fetch=async (url,options) => {
+    assert.equal(url,'https://api.groq.com/openai/v1/chat/completions')
+    const body=JSON.parse(String(options?.body));models.push(body.model)
+    if(body.model==='retired-model')return new Response('{"error":{"code":"model_not_found","message":"private diagnostic"}}',{status:404})
+    assert.equal(body.model,'openai/gpt-oss-120b');assert.equal(body.reasoning_effort,'low');assert.equal(body.include_reasoning,false)
+    return new Response('{"choices":[{"message":{"content":"{\\"ok\\":true}"}}]}')
+  }
+  const request=()=>generateStructuredObject({schema:z.object({ok:z.literal(true)}),messages:[],shapeInstructions:'{"ok":true}'})
+  try {
+    assert.deepEqual(await request(),{ok:true});assert.deepEqual(models,['retired-model','openai/gpt-oss-120b'])
+    let calls=0
+    globalThis.fetch=async (_url,options)=>{calls++;assert.equal(JSON.parse(String(options?.body)).model,'retired-model');return new Response('{"choices":[{"message":{"content":"{\\"ok\\":true}"}}]}')}
+    assert.deepEqual(await request(),{ok:true});assert.equal(calls,1)
+    calls=0;globalThis.fetch=async()=>{calls++;return new Response('private credential diagnostic',{status:401})}
+    await assert.rejects(request(),error=>error instanceof Error && error.message.includes('401') && !error.message.includes('private'));assert.equal(calls,1)
+  } finally {
+    globalThis.fetch=originalFetch
+    if(oldKey===undefined)delete process.env.GROQ_API_KEY;else process.env.GROQ_API_KEY=oldKey
+    if(oldModel===undefined)delete process.env.GROQ_MODEL;else process.env.GROQ_MODEL=oldModel
   }
 })

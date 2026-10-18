@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, type CSSProperties, type MouseEvent } from 'react'
+import { useEffect, useState, type CSSProperties, type MouseEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { TEMPLATES } from '@/lib/templates'
+import { TEMPLATES, TEMPLATE_CATEGORIES } from '@/lib/templates'
+import { LandingShowcase } from '@/components/landing-showcase'
 import { PRO_CONTACT_URL } from '@/lib/billing/contact'
 import { TemplatePreviewCard } from '@/components/template-preview-card'
 import {
@@ -27,7 +28,6 @@ import {
   ChevronRight,
 } from 'lucide-react'
 
-const TEMPLATE_GROUPS = Array.from({ length: 4 }, (_, index) => TEMPLATES.slice(index * 4, index * 4 + 4))
 
 const HERO_SIGNALS = [
   {
@@ -37,7 +37,7 @@ const HERO_SIGNALS = [
   },
   {
     label: 'Template coverage',
-    value: '16 templates',
+    value: `${TEMPLATES.length} templates`,
     detail: 'Professional layouts with consistent hierarchy and spacing.',
   },
   {
@@ -101,7 +101,20 @@ export default function HomePage() {
   const { user, isLoading } = useAuth()
   const router = useRouter()
   const [ctaPointer, setCtaPointer] = useState({ x: 50, y: 50, active: false })
+  const [templateCategory, setTemplateCategory] = useState('All')
 
+  useEffect(() => {
+    if (isLoading || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const sections = document.querySelectorAll<HTMLElement>('[data-reveal]')
+    const observer = new IntersectionObserver(entries => {
+      for (const entry of entries) if (entry.isIntersecting) {
+        entry.target.classList.add('reveal-visible')
+        observer.unobserve(entry.target)
+      }
+    }, { threshold:0.08 })
+    sections.forEach(section => { section.classList.add('reveal-ready'); observer.observe(section) })
+    return () => { observer.disconnect(); sections.forEach(section => section.classList.remove('reveal-ready')) }
+  }, [isLoading])
 
   const handleCtaPointerMove = (event: MouseEvent<HTMLElement>) => {
     const bounds = event.currentTarget.getBoundingClientRect()
@@ -212,7 +225,8 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="mx-auto mt-12 max-w-5xl">
+          <LandingShowcase />
+          <div className="mx-auto mt-8 max-w-5xl" data-reveal>
             <div className="signal-panel rounded-lg border border-zinc-200 bg-white/95 shadow-[0_24px_70px_rgba(24,24,27,0.08)] backdrop-blur">
               <div className="flex items-start justify-between gap-4 border-b border-zinc-200 px-5 py-4">
                 <div>
@@ -299,7 +313,7 @@ export default function HomePage() {
             <FeatureCard
               icon={Palette}
               title="Multiple Templates"
-              description="Switch between sixteen layouts to match your role, industry, and seniority."
+              description={`Choose from ${TEMPLATES.length} layouts with different columns, typography, and section structures.`}
             />
             <FeatureCard
               icon={FileSearch}
@@ -319,7 +333,7 @@ export default function HomePage() {
             <h2 className="mb-4 text-4xl font-bold">Build Your CV in 3 Simple Steps</h2>
           </div>
 
-          <div className="step-flow grid gap-8 md:grid-cols-3">
+          <div className="step-flow grid gap-8 md:grid-cols-3" data-reveal>
             {[
               {
                 step: '1',
@@ -361,19 +375,20 @@ export default function HomePage() {
         <div className="container mx-auto max-w-7xl">
           <div className="motion-fade-up mb-16 text-center">
             <Badge variant="outline" className="mb-4">
-              16 Professional Templates
+              {TEMPLATES.length} Professional Templates
             </Badge>
-            <h2 className="mb-4 text-4xl font-bold">Preview the Templates Directly on the Landing Page</h2>
+            <h2 className="mb-4 text-4xl font-bold">Find a layout that feels like you</h2>
             <p className="mx-auto max-w-2xl text-xl text-muted-foreground">
-              Each card below renders a real sample CV preview so visitors see an actual template, not an
-              empty placeholder.
+              From clean single-column résumés to editorial layouts and structured sidebars.
+              Choose your layout, then make it yours with colors and typography.
             </p>
           </div>
 
-          <div className="motion-fade-up-delay space-y-8">
-            {TEMPLATE_GROUPS.map((group, index) => (
-              <div key={index} className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-4">
-                {group.map((template) => (
+          <div className="mb-8 flex flex-wrap justify-center gap-2" role="group" aria-label="Template categories">
+            {['All', ...TEMPLATE_CATEGORIES].map(category => <Button key={category} variant={templateCategory === category ? 'default' : 'outline'} aria-pressed={templateCategory === category} onClick={() => setTemplateCategory(category)}>{category}</Button>)}
+          </div>
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                {TEMPLATES.filter(template => templateCategory === 'All' || template.category === templateCategory).map((template) => (
                   <TemplatePreviewCard
                     key={template.id}
                     templateId={template.id}
@@ -384,13 +399,11 @@ export default function HomePage() {
                     ctaLabel="Use Template"
                   />
                 ))}
-              </div>
-            ))}
           </div>
 
           <div className="mt-12 text-center">
             <Button size="lg" onClick={() => router.push('/auth/signin')}>
-              Browse All 16 Templates
+              Start with your favorite template
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </div>
@@ -418,7 +431,7 @@ export default function HomePage() {
                 <ul className="mb-6 space-y-3">
                   {[
                     '1 CV total (enforced)',
-                    'All 16 templates',
+                    `All ${TEMPLATES.length} templates`,
                     'AI ATS review',
                     'PDF export',
                     'Version history',

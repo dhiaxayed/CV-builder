@@ -10,7 +10,7 @@ Vercel remains the production host. No VPS, container, additional authentication
 - Builds compile the application and prepare LaTeX resources without querying Supabase. `pnpm db:check` and `pnpm db:check:deployment` are optional read-only diagnostics; they accept the original schema and do not apply migrations.
 - Keep the repository's `postinstall`: on Linux x64 it installs SHA-256-verified portable Tectonic 0.16.9 into `vendor/tectonic-linux-x64/bin`. `pnpm build` then compiles every design with both typefaces and a synthetic photo to prepare `vendor/tectonic-cache`. The same version is installed on Windows x64 for local verification. Custom download URLs/versions require `TECTONIC_SHA256`. Build failure stops deployment if these resources cannot compile.
 - Set `LATEX_RENDERER=tectonic`. The PDF routes use the Node runtime and allow 300 seconds. Verify Fluid Compute and your project's function duration settings.
-- `next.config.mjs` explicitly traces the Tectonic binary, prepared LaTeX resources and dynamically loaded PDF workers into both private and public PDF functions. Run `pnpm check:bundles` after the build. The native binary check runs on Linux CI; a Windows build cannot validate the Linux executable.
+- `next.config.mjs` explicitly traces the Tectonic binary and prepared LaTeX resources into both private and public PDF functions. Page counting uses pure JavaScript; PDF.js and native canvas stay in development tooling. Run `pnpm check:bundles` after the build. The native binary check runs on Linux CI; a Windows build cannot validate the Linux executable.
 
 ## Environment
 
@@ -25,12 +25,14 @@ Keep existing working values. Configure each Vercel environment separately, usin
 | `EMAIL_PROVIDER` | `smtp` or `resend`; console delivery is development-only |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | Existing SMTP configuration when SMTP is selected |
 | `RESEND_API_KEY` | Required only for Resend |
-| `GROQ_API_KEY`, `GROQ_MODEL` | Groq integration; default model `llama-3.3-70b-versatile` |
+| `GROQ_API_KEY`, `GROQ_MODEL` | Groq integration; default model `openai/gpt-oss-120b`; unavailable model overrides get one retry with this replacement |
 | `OPENROUTER_API_KEY`, `OPENROUTER_MODEL` | Supported existing OpenRouter configuration when no Groq key is set |
 | `GROQ_TIMEOUT_MS`, `OPENROUTER_TIMEOUT_MS` | Per-call timeouts, default 10/25 seconds; the whole structured request is bounded by 40 seconds |
 | `LATEX_RENDERER` | `tectonic` on Vercel |
 
 Credential order is modern secret key, legacy service-role key, then the original public-key fallback. Existing environment variables need no renaming. Groq takes precedence when both AI provider keys exist; failures produce labelled local analysis, without silently switching providers. Free models can queue or time out despite valid credentials. Set `TRUST_PROXY_HEADERS=0` on Vercel; its trusted deployment IP header is handled directly.
+
+Groq retired several models used by older configurations in 2026, including Llama 3.3 70B for free/developer tiers on August 16. The adapter preserves successful model overrides. A missing model (404) or explicit `model_decommissioned` response gets one retry on `openai/gpt-oss-120b`, using the same Groq key and request deadline. GPT-OSS requests use low reasoning effort and omit reasoning text. See [Groq's deprecation history](https://console.groq.com/docs/deprecations).
 
 ### Existing database compatibility
 
@@ -58,7 +60,7 @@ See [Vercel function limits](https://vercel.com/docs/functions/limitations) and 
 
 1. Verify magic-link email receipt, expiry, one-use consumption, logout and both users' access isolation.
 2. Create/edit a CV, wait for autosave, reload, save several named snapshots, restore an older one and confirm original history is unchanged. Race two real database connections/tabs.
-3. Upload a valid photo; reject malformed/oversized images. Test all sixteen templates, including a cold PDF render with the actual Tectonic runtime, current contact links and accented text.
+3. Upload a valid photo; reject malformed/oversized images. Test all twenty-four templates, including a cold PDF render with the actual Tectonic runtime, current contact links and accented text.
 4. Export PDF, LaTeX and portable JSON. Preview and PDF must agree; long CVs must receive an explicit overflow message unless multi-page export is selected.
 5. Publish, edit privately, revoke, and verify public JSON, PDF and photo access immediately. Re-enable and confirm the old token stays revoked.
 6. Run `pnpm test:ai:live` in a suitably configured local/staging shell. This sends only a synthetic CV and exits unsuccessfully when the provider falls back. Check real review/tailoring/condensation in Preview, including Pro permissions and apply/undo.

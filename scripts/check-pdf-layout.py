@@ -19,5 +19,7 @@ for filename in sorted(directory.glob("*.pdf")):
         assert page.hyperlinks, f"{filename}: missing live hyperlinks"
         results.append({"template": filename.stem, "pages": 1, "characters": len(chars),
                         "out_of_bounds": 0, "links": len(page.hyperlinks)})
-assert len(results) == 16, f"Expected sixteen generated PDFs, found {len(results)}"
+manifest = json.loads(Path('public/templates/manifest.json').read_text())
+expected = {item['template'] for item in manifest['templates']}
+assert {item['template'] for item in results} == expected, 'Generated PDFs must cover the complete template catalogue'
 print(json.dumps(results, indent=2))

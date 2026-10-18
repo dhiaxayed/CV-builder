@@ -40,19 +40,21 @@ async function main() {
     const data = createSampleCVData()
     data.basics.photoUrl = 'data:image/png;base64,' + photo.toString('base64')
     const env = { ...process.env,TECTONIC_CACHE_DIR:cache,XDG_CACHE_HOME:cache }
-    for (const template of TEMPLATE_IDS) {
-      for (const font of ['sans','serif'] as const) {
-        // Both typeface overrides and all header/photo variants must work offline.
-        data.appearance = { colorTheme:'template',font }
-        for (const density of ['normal','compact','dense'] as const) {
+    // Warm every composition, then the body-size/typeface resource variants.
+    // TeX resources depend on fonts/packages, not on every Cartesian combination
+    // of layout tokens. Recompiling that product made deployments needlessly slow.
+    const cases = [
+      ...TEMPLATE_IDS.map(template => ({ template, font:'template' as const, density:'normal' as const })),
+      ...(['sans','serif'] as const).flatMap(font => (['normal','compact','dense'] as const).map(density => ({ template:'compact' as const,font,density }))),
+    ]
+    for (const { template,font,density } of cases) {
+          data.appearance = { colorTheme:'template',font }
           await fs.writeFile(path.join(work,'cv.tex'),generateLatex(data,template,density),'utf8')
           const result = await runLatexProcess(command,['--untrusted','--keep-logs',`--outdir=${work}`,path.join(work,'cv.tex')],work,env,300000)
           if (result.code !== 0) throw new Error(`Unable to prepare ${template}/${font}/${density}: ${result.output.slice(-3000)}`)
           const pdf = await fs.readFile(path.join(work,'cv.pdf'))
           if (pdf.subarray(0,5).toString() !== '%PDF-') throw new Error(`Invalid ${template}/${font}/${density} build PDF.`)
-        }
-      }
-      console.log(`[pdf-cache] ${template}: both typefaces and all densities compiled with photo.`)
+      console.log(`[pdf-cache] ${template}/${font}/${density}: compiled with photo.`)
     }
     await fs.writeFile(path.join(cache,'ready.json'),JSON.stringify({ key,platform:process.platform,arch:process.arch,templates:TEMPLATE_IDS.length })+'\n')
   } finally {

@@ -50,7 +50,7 @@ The PDF renderer counts actual compiled pages, tries at most three density setti
 - Upload valid and malformed photos, remove them, restore snapshots, and inspect the PDF/JSON output. Check orphan candidates without deleting images referenced by drafts, public snapshots, historical snapshots or user profiles.
 - Publish, edit privately, revoke and re-enable. Check both public JSON and PDF after revocation, including cached renders and photo access.
 - Run real SMTP and configured-provider smoke tests using synthetic CVs. Local automated provider tests mock HTTP contracts or deliberately disable providers; they do not prove live delivery/model availability. `pnpm test:ai:live` performs an explicit synthetic-CV provider check and fails if local fallback was used.
-- Export all sixteen templates with representative real staging fixtures and verify thumbnails. `pnpm templates:generate` refreshes published preview images; the PDF suite detects stale renderer/fixture hashes.
+- Export all twenty-four templates with representative real staging fixtures and verify thumbnails. `pnpm templates:generate` refreshes published preview images; the PDF suite detects stale renderer/fixture hashes.
 
 ## Recovery and rollback
 

@@ -1,0 +1,3 @@
+Geist and Geist Mono, SIL Open Font License 1.1
+Source: https://github.com/vercel/geist-font/tree/e1f671c727f6de7e97c1e1d26dbb44f349c19459
+Self-hosted to keep production builds independent of Google Fonts.

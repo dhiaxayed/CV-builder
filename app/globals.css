@@ -75,8 +75,8 @@
 }
 
 @theme inline {
-  --font-sans: 'Geist', 'Geist Fallback';
-  --font-mono: 'Geist Mono', 'Geist Mono Fallback';
+  --font-sans: var(--font-geist-sans), Arial, sans-serif;
+  --font-mono: var(--font-geist-mono), Consolas, monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -347,6 +347,21 @@
   }
 }
 
+/* Product motion uses transforms; content remains visible before hydration. */
+.showcase-stage { overflow: hidden; perspective: 1100px; }
+.showcase-orbit { position: absolute; inset: 12% 8%; border-radius: 50%; background: radial-gradient(ellipse, #dbeafe 0%, #ecfdf5 36%, transparent 70%); animation: showcase-glow 9s ease-in-out infinite alternate; }
+.showcase-sheet { position: absolute; top: 30px; left: 50%; width: clamp(180px, 31vw, 285px); border: 1px solid #e4e4e7; border-radius: 6px; background: white; box-shadow: 0 24px 50px -15px #18181b30; }
+.showcase-sheet-center { z-index: 3; margin-left: clamp(-142.5px, -15.5vw, -90px); animation: showcase-float 6s ease-in-out infinite; }
+.showcase-sheet-left { z-index: 1; transform: translateX(-132%) rotate(-11deg) scale(.88); animation: showcase-left 7s ease-in-out infinite; }
+.showcase-sheet-right { z-index: 2; transform: translateX(32%) rotate(11deg) scale(.88); animation: showcase-right 7s ease-in-out infinite; }
+.showcase[data-paused='true'] *, .showcase:focus-within * { animation-play-state: paused; }
+.reveal-ready { opacity: 0; transform: translateY(28px); transition: opacity 700ms ease, transform 700ms cubic-bezier(.22,1,.36,1); }
+.reveal-ready.reveal-visible { opacity: 1; transform: translateY(0); }
+@keyframes showcase-float { 0%,100% { transform: translateY(0) rotate(-1deg); } 50% { transform: translateY(-15px) rotate(1deg); } }
+@keyframes showcase-left { 0%,100% { transform: translate(-132%, 8px) rotate(-11deg) scale(.88); } 50% { transform: translate(-138%, -7px) rotate(-8deg) scale(.88); } }
+@keyframes showcase-right { 0%,100% { transform: translate(32%, -5px) rotate(11deg) scale(.88); } 50% { transform: translate(38%, 10px) rotate(8deg) scale(.88); } }
+@keyframes showcase-glow { from { transform: scale(.92); opacity: .65; } to { transform: scale(1.1); opacity: 1; } }
+
 @keyframes cta-mark-glitch {
   0%,
   100% {
@@ -377,6 +392,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .showcase *, .reveal-ready { animation: none !important; transition: none; }
+  .reveal-ready { opacity: 1; transform: none; }
   .landing-grid,
   .executive-strip::before,
   .motion-fade-up,

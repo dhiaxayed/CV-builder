@@ -6,15 +6,12 @@ const nextConfig = {
   serverExternalPackages: [
     'node-latex-compiler',
     '@node-latex-compiler/bin-linux-x64',
-    'pdf-parse',
   ],
-  // pdf-parse loads its worker dynamically; static tracing cannot discover it.
   // Route keys are globs, so * also matches the dynamic share-token segment.
   outputFileTracingIncludes: Object.fromEntries(
     ['/api/pdf', '/api/share/*/pdf'].map(route => [route, [
       './vendor/tectonic-linux-x64/**/*',
       './vendor/tectonic-cache/**/*',
-      './node_modules/pdf-parse/dist/**/pdf.worker.mjs',
     ]]),
   ),
   // Old versions of the compiler dependency kept documents inside its package.

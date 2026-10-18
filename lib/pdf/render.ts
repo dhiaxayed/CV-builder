@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { PDFParse } from 'pdf-parse'
+import { PDFDocument } from 'pdf-lib'
 import { generateLatex, type RenderDensity } from '@/lib/latex/generator'
 import { type CVData } from '@/lib/types/cv'
 import { compileLatexToPdf } from './compiler'
@@ -22,7 +22,7 @@ const pending = new Map<string,Promise<RenderResult>>()
 let active = 0
 
 export async function renderCV(data: CVData, templateId: string, pageMode: PageMode = 'one-page', photoData?: string): Promise<RenderResult> {
-  const hash = createHash('sha256').update(JSON.stringify({ data,templateId,pageMode,photoData,renderer:process.env.LATEX_RENDERER,version:2 })).digest('hex')
+  const hash = createHash('sha256').update(JSON.stringify({ data,templateId,pageMode,photoData,renderer:process.env.LATEX_RENDERER,version:3 })).digest('hex')
   const cached = cache.get(hash)
   if (cached && Date.now()-cached.at < 180000) return cached.value
   const existing = pending.get(hash)
@@ -36,8 +36,10 @@ export async function renderCV(data: CVData, templateId: string, pageMode: PageM
         const latex = generateLatex(data,templateId,density)
         const compiled = await compileLatexToPdf(latex,photoData)
         if (compiled.bytes.length > 4 * 1024 * 1024) throw new AppError(413,'PDF_TOO_LARGE','This PDF exceeds the download size limit. Reduce image size or content and retry.')
-        const parser = new PDFParse({ data: new Uint8Array(compiled.bytes) })
-        try { pages = (await parser.getInfo()).total } finally { await parser.destroy() }
+        // Page counting needs a PDF parser, not PDF.js workers or native canvas.
+        // Keeping those build-time preview dependencies out prevents cold-start
+        // crashes when a serverless function contains only its traced assets.
+        pages = (await PDFDocument.load(compiled.bytes, { updateMetadata:false })).getPageCount()
         if (compiled.overfullPoints <= 2 && (pages === 1 || pageMode === 'multi-page')) {
           const result = { bytes:compiled.bytes,pages,density,hash,latex }
           cache.set(hash,{ at:Date.now(),value:result })
