@@ -22,7 +22,9 @@ async function main() {
   const digest = createHash('sha256').update(await fs.readFile(command))
   for (const file of ['lib/latex/generator.ts','lib/templates.ts','lib/types/cv.ts','scripts/prepare-latex-cache.ts']) digest.update(await fs.readFile(file))
   const key = digest.digest('hex')
-  const cache = path.resolve('vendor/tectonic-cache')
+  // An optional output directory lets QA certify a completely empty cache.
+  const cacheArgument=process.argv.find(argument => argument.startsWith('--cache-dir='))
+  const cache = path.resolve(cacheArgument ? cacheArgument.slice('--cache-dir='.length) : 'vendor/tectonic-cache')
   try {
     const ready = JSON.parse(await fs.readFile(path.join(cache,'ready.json'),'utf8'))
     if (ready.key === key && ready.platform === process.platform && ready.arch === process.arch) {
@@ -38,25 +40,28 @@ async function main() {
     const photo = await sharp({ create:{ width:128,height:128,channels:3,background:'#345678' } }).png().toBuffer()
     await fs.writeFile(path.join(work,'cv_photo.png'),photo)
     const data = createSampleCVData()
-    data.basics.photoUrl = 'data:image/png;base64,' + photo.toString('base64')
+    const photoUrl='data:image/png;base64,' + photo.toString('base64')
     const env = { ...process.env,TECTONIC_CACHE_DIR:cache,XDG_CACHE_HOME:cache }
-    // Warm every composition, then the body-size/typeface resource variants.
+    // Both header branches need warming: text-only ledger headers use small
+    // contact fonts that are never exercised by their photo headers.
+    // Then warm the body-size/typeface resource variants.
     // TeX resources depend on fonts/packages, not on every Cartesian combination
     // of layout tokens. Recompiling that product made deployments needlessly slow.
     const cases = [
-      ...TEMPLATE_IDS.map(template => ({ template, font:'template' as const, density:'normal' as const })),
-      ...(['sans','serif'] as const).flatMap(font => (['normal','compact','dense'] as const).map(density => ({ template:'compact' as const,font,density }))),
+      ...TEMPLATE_IDS.flatMap(template => [false,true].map(withPhoto => ({ template, font:'template' as const, density:'normal' as const,withPhoto }))),
+      ...(['sans','serif'] as const).flatMap(font => (['normal','compact','dense'] as const).map(density => ({ template:'compact' as const,font,density,withPhoto:true }))),
     ]
-    for (const { template,font,density } of cases) {
+    for (const { template,font,density,withPhoto } of cases) {
+          data.basics.photoUrl=withPhoto ? photoUrl : undefined
           data.appearance = { colorTheme:'template',font }
           await fs.writeFile(path.join(work,'cv.tex'),generateLatex(data,template,density),'utf8')
           const result = await runLatexProcess(command,['--untrusted','--keep-logs',`--outdir=${work}`,path.join(work,'cv.tex')],work,env,300000)
           if (result.code !== 0) throw new Error(`Unable to prepare ${template}/${font}/${density}: ${result.output.slice(-3000)}`)
           const pdf = await fs.readFile(path.join(work,'cv.pdf'))
           if (pdf.subarray(0,5).toString() !== '%PDF-') throw new Error(`Invalid ${template}/${font}/${density} build PDF.`)
-      console.log(`[pdf-cache] ${template}/${font}/${density}: compiled with photo.`)
+      console.log(`[pdf-cache] ${template}/${font}/${density}: compiled ${withPhoto ? 'with' : 'without'} photo.`)
     }
-    await fs.writeFile(path.join(cache,'ready.json'),JSON.stringify({ key,platform:process.platform,arch:process.arch,templates:TEMPLATE_IDS.length })+'\n')
+    await fs.writeFile(path.join(cache,'ready.json'),JSON.stringify({ key,platform:process.platform,arch:process.arch,templates:TEMPLATE_IDS.length,photoModes:['without-photo','with-photo'] })+'\n')
   } finally {
     if (path.dirname(work) === path.resolve(tmpdir()) && path.basename(work).startsWith('cv-pdf-build-')) await fs.rm(work,{ recursive:true,force:true,maxRetries:3,retryDelay:150 })
   }

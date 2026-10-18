@@ -10,7 +10,9 @@ Each compilation uses a unique temporary directory, disabled shell escape/untrus
 
 ## Layout and portability
 
-The prepared working set covers all twenty-four templates, the font/package resources used by both typefaces and all three density levels, including a synthetic photo. Missing-glyph warnings are treated as export errors: unsupported characters cannot silently disappear from a valid PDF.
+The prepared working set covers all twenty-four templates both with and without a photo, plus the font/package resources used by both typefaces and all three density levels. Both header branches must be compiled: the text-only ledger headers use small contact fonts that their photo headers do not exercise. Missing-glyph warnings are treated as export errors: unsupported characters cannot silently disappear from a valid PDF.
+
+To reproduce a genuinely cold preparation without reusing developer resources, run `pnpm exec tsx scripts/prepare-latex-cache.ts --cache-dir=tmp/pdf-clean-cache`. The directory must start empty. CI builds its working set from a fresh checkout and then checks all twenty-four templates offline with and without photos.
 
 The renderer counts actual PDF pages and checks TeX overfull boxes. It tries normal, compact and dense layouts without discarding text, reducing body type below 9.5 pt or margins below 12 mm. Strict one-page overflow returns 422 with the largest sections; users can shorten content or explicitly select multi-page output. Unsupported scripts/fonts can fail clearly and need a dedicated font configuration; Latin accents are tested.
 
