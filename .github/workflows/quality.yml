@@ -35,6 +35,7 @@ jobs:
       - run: python scripts/check-pdf-layout.py
       - run: node scripts/verify-function-bundles.mjs
       - run: pnpm test:production
+      - run: E2E_DATABASE_KEY_TYPE=secret pnpm test:production
       - run: pnpm test:e2e
       - run: pnpm audit --prod --audit-level moderate
       - uses: actions/upload-artifact@v4

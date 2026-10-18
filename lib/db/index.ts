@@ -1,6 +1,7 @@
 import 'server-only'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { AppError } from '@/lib/errors'
+import { serverDatabaseKey } from './config'
 import { createEmptyCVData, CVData } from '../types/cv'
 
 // Re-export the canonical CVData type from types/cv
@@ -11,7 +12,7 @@ export { createEmptyCVData }
 // NEXT_PUBLIC values are frozen at build time. A private runtime URL also lets
 // Preview and production smoke checks select their isolated database safely.
 const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+const supabaseServiceKey = serverDatabaseKey(process.env)
 
 function getSupabaseClient() {
   if (!supabaseUrl || !supabaseServiceKey) {

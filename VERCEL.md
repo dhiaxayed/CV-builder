@@ -18,7 +18,7 @@ Keep existing working values. Configure each Vercel environment separately, usin
 | Variable | Purpose |
 | --- | --- |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | Required server-only credential for custom sessions/private queries; never use a `NEXT_PUBLIC_` prefix |
+| `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY` | Required server-only credential: modern `sb_secret_...` key or legacy `service_role` key; modern takes precedence. Never use a `NEXT_PUBLIC_` prefix |
 | `NEXT_PUBLIC_APP_URL` | Actual HTTPS application origin, including the Preview origin when testing authentication |
 | `EMAIL_PROVIDER` | `smtp` or `resend`; console delivery is development-only |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | Existing SMTP configuration when SMTP is selected |
@@ -29,6 +29,16 @@ Keep existing working values. Configure each Vercel environment separately, usin
 | `LATEX_RENDERER` | `tectonic` on Vercel |
 
 The public Supabase key may remain configured for compatibility, but the application never uses it as a privileged fallback. Groq takes precedence when both provider keys exist; provider failures produce labelled local analysis, without silently switching providers. Free models can queue or time out despite valid credentials. Set `TRUST_PROXY_HEADERS=0` on Vercel; its trusted deployment IP header is handled directly.
+
+### Fixing missing database configuration during build
+
+If the build reports `Missing deployment configuration`, the listed variable is absent or empty in that deployment's environment. A working local `.env.local` or a value saved only for Preview does not configure Production.
+
+1. In Supabase, open the project's **Settings > API Keys**. Use a modern secret key (`sb_secret_...`) or the legacy `service_role` key, never the publishable/anon key. See [Supabase API keys](https://supabase.com/docs/guides/api/api-keys).
+2. In Vercel, open **Project > Settings > Environment Variables**. Save the key as `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY`, and the URL as `NEXT_PUBLIC_SUPABASE_URL` (or `SUPABASE_URL`). Select **Production** for `main`; configure Preview separately with staging credentials.
+3. Save and **Redeploy**. Environment changes affect new deployments only; see [Vercel environment variables](https://vercel.com/docs/environment-variables/managing-environment-variables).
+
+The application still requires migrations 003/004 and verified permissions. Supplying a key does not apply SQL or bypass the schema check.
 
 ## Database rollout
 

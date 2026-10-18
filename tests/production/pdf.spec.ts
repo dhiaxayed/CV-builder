@@ -6,7 +6,8 @@ import { renderFixture } from '../fixtures/render'
 
 test('production build: secure magic-link cookie, authenticated native PDF/source, public PDF and revocation',async ({ request }) => {
   test.setTimeout(180000)
-  const db=createClient('http://127.0.0.1:3002','isolated-test-service-key',{ auth:{ persistSession:false,autoRefreshToken:false } })
+  const key=process.env.E2E_DATABASE_KEY_TYPE === 'secret' ? 'sb_secret_isolated-test-key' : 'isolated-test-service-key'
+  const db=createClient('http://127.0.0.1:3002',key,{ auth:{ persistSession:false,autoRefreshToken:false } })
   const nonce=randomBytes(24).toString('base64url')
   const seeded=await db.from('auth_tokens').insert({ email:`production-${nonce.slice(0,12)}@example.invalid`,type:'magic_link',token:createHash('sha256').update(nonce).digest('hex'),expires_at:new Date(Date.now()+600000).toISOString() })
   expect(seeded.error).toBeNull()

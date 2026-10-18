@@ -1,3 +1,5 @@
+import { serverDatabaseKey } from '../../lib/db/config'
+
 type DatabaseEnvironment = Record<string, string | undefined>
 
 const requiredTables = {
@@ -16,13 +18,19 @@ const requiredFunctions = [
 /** Read schema metadata and zero rows only. Never run a migration or invoke an RPC. */
 export async function verifyDatabaseReadiness(env: DatabaseEnvironment, request: typeof fetch = fetch) {
   const databaseUrl = env.SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL
-  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY
+  const serviceKey = serverDatabaseKey(env)
   if (!databaseUrl || !serviceKey) {
-    throw new Error('Database readiness requires the Supabase URL and server-only SUPABASE_SERVICE_ROLE_KEY.')
+    const missing = [
+      ...(!databaseUrl ? ['SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL'] : []),
+      ...(!serviceKey ? ['SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY (server-only)'] : []),
+    ]
+    throw new Error(`Missing deployment configuration: ${missing.join('; ')}. Add the missing variables in Vercel Settings > Environment Variables for this deployment environment, then redeploy. A publishable/anon key cannot replace a server credential.`)
   }
 
   const root = new URL('/rest/v1/', databaseUrl)
-  const headers = { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` }
+  // Modern secret keys are not JWTs. Legacy service-role keys also need Bearer.
+  const headers: Record<string, string> = { apikey: serviceKey }
+  if (!serviceKey.startsWith('sb_secret_')) headers.Authorization = `Bearer ${serviceKey}`
   // One deadline covers every request, including the metadata response body.
   const signal = AbortSignal.timeout(15_000)
   try {

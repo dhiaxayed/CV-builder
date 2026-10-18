@@ -104,13 +104,13 @@ Les six palettes supplémentaires et les choix serif/sans serif sont indépendan
 
 ## G. Résultats exécutés
 
-Exécutions locales sous Windows x64, Node.js 23.8.0, pnpm 10.13.1 et Python 3.13.3. La CI et les instructions Vercel ciblent Node.js 22 ; la CI Linux n'a pas été exécutée depuis ce terminal.
+Exécutions locales sous Windows x64, Node.js 23.8.0, pnpm 10.13.1 et Python 3.13.3. La CI et les instructions Vercel ciblent Node.js 22. La [CI Linux du commit `556f4e6`](https://github.com/dhiaxayed/CV-builder/actions/runs/39071405882) a terminé avec succès sur GitHub ; cela ne valide pas la configuration Supabase du compte Vercel.
 
 | Commande / contrôle | Résultat observé |
 | --- | --- |
 | `pnpm typecheck` | Réussi |
 | `pnpm lint --max-warnings 0` | Réussi, aucune erreur ni warning |
-| `pnpm test` | 14 tests unitaires + 7 tests PostgreSQL réussis, dont le contrôle de préparation du déploiement |
+| `pnpm test` | 16 tests unitaires + 7 tests PostgreSQL réussis, dont les deux types de clés serveur et le contrôle de préparation du déploiement |
 | `pnpm test:pdf` avec Tectonic | 37/37 réussis : rendu, aperçus, overflow, images, palette, caractères et multipage |
 | `pnpm exec tsx --test tests/pdf/*.test.ts` avec `LATEX_RENDERER=system` | 37/37 réussis ; la comparaison raster des aperçus est réservée à Tectonic |
 | `pnpm exec tsx --test --test-name-pattern='published thumbnails' tests/pdf/render.test.ts` | Réussi après la régénération finale et la normalisation des fins de ligne Windows/Linux |
@@ -120,7 +120,7 @@ Exécutions locales sous Windows x64, Node.js 23.8.0, pnpm 10.13.1 et Python 3.1
 | `pnpm templates:generate` | 16 aperçus issus des PDF réels, texte vérifié et manifest régénéré |
 | `pnpm build` | Build optimisée Next.js 16.4.2 réussie |
 | `pnpm check:bundles` | Deux fonctions vérifiées, environ 147,7 Mio de traces chacune ; workers présents, aucun PDF, dossier QA ou fichier `.env` embarqué |
-| `pnpm test:production` | 1/1 réussi sur `next start` : cookie Secure/HttpOnly/SameSite, PDF natif, source cohérente et révocation |
+| `pnpm test:production` | 1/1 réussi avec chaque configuration serveur (ancienne et moderne) sur `next start` : cookie Secure/HttpOnly/SameSite, PDF natif, source cohérente et révocation |
 | `pnpm test:e2e` | 14/14 réussis : authentification, mobile, style, sauvegardes, versions, droits, photos et partage |
 | `pnpm test:ai:live` | 3 actions OpenRouter réelles, contrats validés et réécritures factuelles filtrées |
 | `pnpm test:e2e:ai:live` | 1/1 réussi avec le fournisseur réel : analyse, condensation, application/sauvegarde/annulation et adaptation Pro |
@@ -138,9 +138,11 @@ Les échecs intermédiaires n'ont pas été masqués : syntaxe IA initiale, work
 
 Avant le push de livraison, ajout d'un contrôle Vercel en lecture seule : colonnes requises et présence des huit RPC via les métadonnées PostgREST. Il bloque la build si les migrations ou l'accès serveur manquent, sans exécuter de SQL ni récupérer de CV. La version actuellement publiée n'est ainsi pas remplacée par cette build incomplète. Ce contrôle ne remplace pas la vérification SQL des permissions ni la recette hébergée.
 
+Le journal Vercel fourni après ce push confirme l'installation de Tectonic 0.16.9, puis un arrêt sur l'absence d'URL ou de clé serveur dans l'environnement de build. Le diagnostic distingue désormais ces variables. Le serveur et les contrôles acceptent `SUPABASE_SECRET_KEY` (clé moderne, prioritaire) et `SUPABASE_SERVICE_ROLE_KEY` (ancienne clé), sans repli sur une clé publique. Les requêtes manuelles de préparation transmettent une clé moderne uniquement via `apikey`. La session ne dispose ni de la clé serveur locale ni d'un accès aux paramètres Vercel : leur configuration effective reste une action du propriétaire du compte.
+
 1. Appliquer/vérifier les migrations dans un Supabase de staging, puis lors du déploiement coordonné. La session locale ne dispose pas d'un accès SQL privilégié au projet hébergé. Les secrets Vercel existants n'ont pas été inspectés ni remplacés.
 2. Vérifier les grants/RLS effectifs et les autres politiques/rôles/RPC exposés dans le projet réel, puis lancer les tests avec deux connexions PostgreSQL réelles. PGlite exécute bien les migrations PostgreSQL mais sérialise les connexions locales ; ses courses ne prouvent pas l'ordonnancement des verrous du service distant.
-3. Exécuter la CI Linux et un Preview Vercel pour valider le binaire musl, la taille finale des fonctions, la copie du cache à froid, la durée configurée et les cookies dans le vrai contexte HTTPS. Les vérifications locales Windows et la build ne remplacent pas ce contrôle hébergé.
+3. Vérifier la CI du correctif courant et un Preview Vercel pour valider la taille finale des fonctions hébergées, la copie du cache à froid, la durée configurée et les cookies dans le vrai contexte HTTPS. La CI Linux du premier commit a réussi, mais les vérifications locales et la CI ne remplacent pas ce contrôle Vercel.
 4. Connexion et authentification SMTP ont été validées localement après une erreur DNS transitoire. Vérifier encore l'acceptation de l'expéditeur, la réception et la délivrabilité dans le déploiement réel. Les emails automatisés ont été isolés ; aucun email réel n'a été envoyé.
 5. Les fournisseurs IA peuvent être indisponibles ou limités malgré une configuration valide. Les contrôles réels réalisés constituent des mesures ponctuelles ; ils ne garantissent pas une disponibilité permanente ni des formulations parfaites. Les scripts live permettent de les répéter.
 6. Les alphabets et polices hors du périmètre Latin vérifié nécessitent une configuration dédiée ; les montants importants de contenu exigent réduction ou multipage. Aucun contenu n'est supprimé pour forcer artificiellement une page.

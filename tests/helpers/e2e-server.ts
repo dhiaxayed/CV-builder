@@ -6,7 +6,8 @@ import { spawn } from 'node:child_process'
 import { createTestDatabase } from './database'
 
 async function main() {
-const serviceKey = 'isolated-test-service-key'
+const modernKey = process.env.E2E_DATABASE_KEY_TYPE === 'secret'
+const serviceKey = modernKey ? 'sb_secret_isolated-test-key' : 'isolated-test-service-key'
 const db = await createTestDatabase()
 const identifier = (value: string) => {
   if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(value)) throw new Error('Invalid test SQL identifier')
@@ -28,7 +29,7 @@ const server = createServer(async (request,response) => {
       await db.query("UPDATE sessions SET expires_at=now()-interval '1 second' WHERE user_id IN (SELECT id FROM users WHERE email=$1)",[body.email])
       response.end('{"success":true}'); return
     }
-    if (request.headers.authorization !== `Bearer ${serviceKey}`) { response.statusCode=403; response.end('{"message":"permission denied"}'); return }
+    if (request.headers.apikey !== serviceKey || (!modernKey && request.headers.authorization !== `Bearer ${serviceKey}`)) { response.statusCode=403; response.end('{"message":"permission denied"}'); return }
     const segments = url.pathname.split('/').filter(Boolean)
     const rows = await db.transaction(async tx => {
       await tx.exec('SET LOCAL ROLE service_role')
@@ -96,7 +97,7 @@ const server = createServer(async (request,response) => {
 server.listen(3002,'127.0.0.1',() => console.log('Isolated test database ready'))
 const child = spawn(process.execPath,['node_modules/next/dist/bin/next',process.env.E2E_PRODUCTION === '1' ? 'start' : 'dev','--hostname','127.0.0.1','--port','3001'],{
   stdio:'inherit',windowsHide:true,
-  env:{ ...process.env,SUPABASE_URL:'http://127.0.0.1:3002',NEXT_PUBLIC_SUPABASE_URL:'http://127.0.0.1:3002',SUPABASE_SERVICE_ROLE_KEY:serviceKey,NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY:'isolated-public-key',NEXT_PUBLIC_APP_URL:'http://127.0.0.1:3001',EMAIL_PROVIDER:'console',GROQ_API_KEY:process.env.E2E_LIVE_AI === '1' ? process.env.GROQ_API_KEY || '' : '',OPENROUTER_API_KEY:process.env.E2E_LIVE_AI === '1' ? process.env.OPENROUTER_API_KEY || '' : '',LATEX_RENDERER:process.env.LATEX_RENDERER || 'system',NEXT_TELEMETRY_DISABLED:'1' },
+  env:{ ...process.env,SUPABASE_URL:'http://127.0.0.1:3002',NEXT_PUBLIC_SUPABASE_URL:'http://127.0.0.1:3002',SUPABASE_SECRET_KEY:modernKey ? serviceKey : '',SUPABASE_SERVICE_ROLE_KEY:modernKey ? '' : serviceKey,NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY:'isolated-public-key',NEXT_PUBLIC_APP_URL:'http://127.0.0.1:3001',EMAIL_PROVIDER:'console',GROQ_API_KEY:process.env.E2E_LIVE_AI === '1' ? process.env.GROQ_API_KEY || '' : '',OPENROUTER_API_KEY:process.env.E2E_LIVE_AI === '1' ? process.env.OPENROUTER_API_KEY || '' : '',LATEX_RENDERER:process.env.LATEX_RENDERER || 'system',NEXT_TELEMETRY_DISABLED:'1' },
 })
 const stop = async () => { child.kill(); server.close(); await db.close(); process.exit() }
 process.on('SIGINT',stop); process.on('SIGTERM',stop)

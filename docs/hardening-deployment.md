@@ -1,6 +1,6 @@
 # Security and persistence rollout
 
-This application uses custom passwordless sessions. It does not use Supabase Auth JWTs. All private database access runs on the server with `SUPABASE_SERVICE_ROLE_KEY`; browser roles have no table or application RPC access. Ownership is checked in each private query and transactional function. A publishable/anonymous key cannot replace the server credential.
+This application uses custom passwordless sessions. It does not use Supabase Auth JWTs. All private database access runs on the server with `SUPABASE_SECRET_KEY` (modern) or `SUPABASE_SERVICE_ROLE_KEY` (legacy); the modern key takes precedence when both are configured. Browser roles have no table or application RPC access. Ownership is checked in each private query and transactional function. A publishable/anonymous key cannot replace the server credential.
 
 ## Before deployment
 
